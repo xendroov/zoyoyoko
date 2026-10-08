@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <mutex>
+#include <random>
 
 namespace bot {
 
@@ -98,6 +99,7 @@ private:
 
     bool FindAndSelectTarget();
     bool IsTargetValid();
+    DWORD HumanizedDelay(DWORD baseMs, DWORD sigmaMs);
 
     std::atomic<bool>     running_{false};
     std::atomic<BotState> state_{BotState::Idle};
@@ -109,6 +111,9 @@ private:
     float    lastAttackTime_ = 0.0f;
     float    lastBuffTime_ = 0.0f;
     size_t   skillRotationIdx_ = 0;
+
+    std::mt19937 rng_{std::random_device{}()};
+    std::normal_distribution<double> dist_{0.0, 1.0};
 };
 
 } // namespace bot

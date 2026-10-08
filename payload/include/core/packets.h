@@ -43,6 +43,14 @@ namespace Opcode {
     constexpr uint8_t WIZ_GOLD_CHANGE       = 0x64;
 }
 
+// KO packet wire format markers
+namespace WireFormat {
+    constexpr uint16_t HEADER = 0xAA55;
+    constexpr uint16_t FOOTER = 0x55AA;
+    constexpr uint8_t  SEQ_MIN = 1;
+    constexpr uint8_t  SEQ_MAX = 250;
+}
+
 // Packet builder
 class Packet {
 public:

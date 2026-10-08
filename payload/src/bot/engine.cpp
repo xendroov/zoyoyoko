@@ -42,22 +42,27 @@ const char* Engine::GetStateString() const {
     return "unknown";
 }
 
+DWORD Engine::HumanizedDelay(DWORD baseMs, DWORD sigmaMs) {
+    double val = baseMs + dist_(rng_) * sigmaMs;
+    if (val < baseMs * 0.3) val = baseMs * 0.3;
+    if (val > baseMs * 2.5) val = baseMs * 2.5;
+    return static_cast<DWORD>(val);
+}
+
 void Engine::BotLoop() {
     while (running_.load()) {
         auto& game = core::Game::Get();
         if (!game.IsPlayerInGame()) {
-            Sleep(1000);
+            Sleep(HumanizedDelay(1000, 200));
             continue;
         }
 
-        // Olum kontrolu
         if (game.IsPlayerDead()) {
             TickDeath();
-            Sleep(500);
+            Sleep(HumanizedDelay(500, 100));
             continue;
         }
 
-        // Oncelik sirasi: pot > buff > attack > loot
         TickPotion();
         TickBuff();
 
@@ -67,7 +72,7 @@ void Engine::BotLoop() {
         if (config_.loot.autoLoot)
             TickLoot();
 
-        Sleep(100); // Ana dongu gecikmesi
+        Sleep(HumanizedDelay(100, 30));
     }
 }
 
@@ -112,7 +117,7 @@ void Engine::TickBuff() {
     std::lock_guard<std::mutex> lock(configMutex_);
     for (uint32_t skillId : config_.buff.skills) {
         game.UseSkill(skillId);
-        Sleep(500); // Skill arasi bekleme
+        Sleep(HumanizedDelay(500, 120));
     }
 
     gui::Bridge::Get().SendLog("[BUFF] Buff'lar yenilendi");
@@ -125,7 +130,7 @@ void Engine::TickAttack() {
     if (!IsTargetValid()) {
         state_ = BotState::Searching;
         if (!FindAndSelectTarget()) {
-            Sleep(500);
+            Sleep(HumanizedDelay(500, 150));
             return;
         }
     }

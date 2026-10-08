@@ -84,14 +84,33 @@ struct GamePointers {
     bool      resolved;
 };
 
-// Pattern'ler - sunucu versiyonuna gore guncellenmeli
+// Pattern'ler - analizden elde edilen gercek degerler
 namespace Patterns {
-    // Ornek pattern'ler (replika sunucuya gore degisir)
+    // CAPISocket::Send - 0x00704070 (unpacked EXE)
+    // push ebp / mov ebp,esp / push -1 / push SEH_handler
+    constexpr const char* SEND_FNC      = "55 8B EC 6A FF 68 ?? ?? ?? 00 64 A1 00 00 00 00";
+
+    // CPlayer base pointer (sunucuya gore degisebilir)
     constexpr const char* CHAR_BASE     = "8B 0D ?? ?? ?? ?? 85 C9 74 ?? 8B 01 FF 50";
-    constexpr const char* SEND_FNC      = "55 8B EC 83 EC ?? 53 56 57 8B F1 8B 4E";
+
+    // Recv hook noktasi
     constexpr const char* RECV_HOOK     = "55 8B EC 83 EC ?? 56 8B F1 8D 4D";
+
+    // Target select fonksiyonu
     constexpr const char* TARGET_SELECT = "55 8B EC 8B 45 ?? 56 8B F1 89 86";
+
+    // NPC dusman kontrolu
     constexpr const char* NPC_IS_ENEMY  = "55 8B EC 56 8B F1 8B 46 ?? 83 F8";
+}
+
+// Bilinen sabit adresler (bu sunucu icin - Themida unpack sonrasi)
+namespace Addresses {
+    constexpr uintptr_t SND_FNC         = 0x00704070; // CAPISocket::Send
+    constexpr uintptr_t ENCRYPT_FLAG    = 0x11159B4;  // 0=plaintext, !=0 encrypted
+    constexpr uintptr_t PACKET_SEQ      = 0x1111FCC;  // sequence counter (1-250)
+    constexpr uintptr_t PACK_LOG_FLAG   = 0x1111FC5;  // debug log flag
+    constexpr uintptr_t DYNAMIC_KEY     = 0x11166D0;  // AES key (sunucudan)
+    constexpr uintptr_t DYNAMIC_KEY_LEN = 0x11166C8;  // key length
 }
 
 class Game {

@@ -36,15 +36,15 @@ static std::string GetDllDirectory() {
     return (pos != std::string::npos) ? dir.substr(0, pos + 1) : dir;
 }
 
-// Send hook detour
+// Send hook detour (__thiscall -> __fastcall: ECX=this, EDX=unused)
 static void* g_originalSend = nullptr;
 
-void __cdecl HookedSend(const uint8_t* data, int size) {
+void __fastcall HookedSend(void* pThis, void* /*edx*/, const uint8_t* data, int size) {
     core::PacketHook::Get().OnSend(const_cast<uint8_t*>(data), static_cast<size_t>(size));
 
     if (g_originalSend) {
-        using OriginalSend = void(__cdecl*)(const uint8_t*, int);
-        reinterpret_cast<OriginalSend>(g_originalSend)(data, size);
+        using OriginalSend = void(__thiscall*)(void*, const uint8_t*, int);
+        reinterpret_cast<OriginalSend>(g_originalSend)(pThis, data, size);
     }
 }
 

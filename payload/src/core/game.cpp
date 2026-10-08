@@ -27,10 +27,12 @@ bool Game::ResolvePointers() {
         pointers_.ptrChar = Memory::Read<uintptr_t>(addr + 2);
     }
 
-    // Send fonksiyonu
-    addr = Memory::PatternScan(moduleName, Patterns::SEND_FNC);
-    if (addr) {
-        pointers_.fncSend = addr;
+    // Send fonksiyonu - once bilinen adres dene, sonra pattern scan
+    if (Memory::Read<uint8_t>(Addresses::SND_FNC) == 0x55) {
+        pointers_.fncSend = Addresses::SND_FNC;
+    } else {
+        addr = Memory::PatternScan(moduleName, Patterns::SEND_FNC);
+        if (addr) pointers_.fncSend = addr;
     }
 
     // Recv hook noktasi
@@ -152,14 +154,26 @@ std::vector<ItemInfo> Game::GetInventory() {
 bool Game::SendPacket(const uint8_t* data, size_t size) {
     if (!pointers_.fncSend || !data || size == 0) return false;
 
-    // KO send fonksiyonu genelde __thiscall convention kullanir
-    // typedef bool (__thiscall* tSendPacket)(void* pThis, const uint8_t* data, size_t size);
-    // Gercek cagri sunucu versiyonuna gore ayarlanmali
+    // CAPISocket::Send __thiscall convention
+    // ECX = CAPISocket* this pointer (ptrPkt'den veya ptrChar yakinindaki socket pointer)
+    // Parametre: const uint8_t* data, int size
+    // Hook sifrelemeden ONCE yakaliyor - plaintext gonderiyoruz
+    using tSend = void(__thiscall*)(void*, const uint8_t*, int);
+    auto fn = reinterpret_cast<tSend>(pointers_.fncSend);
 
-    // Simdilik hook uzerinden yonlendiriyoruz
-    using SendFn = void(__cdecl*)(const uint8_t*, int);
-    auto fn = reinterpret_cast<SendFn>(pointers_.fncSend);
-    fn(data, static_cast<int>(size));
+    // CAPISocket pointer'i - genelde CPlayer yakininda
+    void* pSocket = nullptr;
+    if (pointers_.ptrChar) {
+        uintptr_t pBase = Memory::Read<uintptr_t>(pointers_.ptrChar);
+        if (pBase) {
+            // CAPISocket genelde global veya CPlayer icerisinde
+            // Offset sunucuya gore ayarlanmali
+            pSocket = reinterpret_cast<void*>(pBase);
+        }
+    }
+
+    if (!pSocket) return false;
+    fn(pSocket, data, static_cast<int>(size));
     return true;
 }
 
