@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<title>KOXP Bot</title>
+<style>
+:root {
+  --bg-base:    #0F0F23;
+  --bg-card:    #1A1A2E;
+  --bg-input:   #16213E;
+  --border:     #2A2A4A;
+  --text:       #E0E0FF;
+  --text-dim:   #8888AA;
+  --accent:     #00D4FF;
+  --accent2:    #7B2FFF;
+  --hp:         #FF3B5C;
+  --mp:         #3B8BFF;
+  --green:      #00FF88;
+  --warn:       #FFB800;
+  --red:        #FF3B5C;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Segoe UI', 'Consolas', monospace;
+  background: var(--bg-base);
+  color: var(--text);
+  font-size: 13px;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #0D0D1F, #1A0A2E);
+  border-bottom: 1px solid var(--accent);
+  -webkit-app-region: drag;
+}
+.header__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.header__status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+/* STATUS PILLS */
+.pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pill--ok   { background: rgba(0,255,136,.15); color: var(--green); border: 1px solid rgba(0,255,136,.3); }
+.pill--err  { background: rgba(255,59,92,.15); color: var(--red); border: 1px solid rgba(255,59,92,.3); }
+.pill--warn { background: rgba(255,184,0,.15); color: var(--warn); border: 1px solid rgba(255,184,0,.3); }
+
+/* NAV */
+.nav {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.nav__btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+}
+.nav__btn:hover { color: var(--text); background: rgba(255,255,255,.03); }
+.nav__btn--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: rgba(0,212,255,.05);
+}
+
+/* PANELS */
+.panel { display: none; padding: 10px; overflow-y: auto; height: calc(100vh - 90px); }
+.panel--active { display: block; }
+
+/* CARDS */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+.card__h {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* VITALS BARS */
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.bar-row__lbl { width: 24px; font-weight: 700; font-size: 12px; }
+.bar { flex: 1; height: 18px; background: rgba(255,255,255,.05); border-radius: 4px; overflow: hidden; position: relative; }
+.bar__fill { height: 100%; border-radius: 4px; transition: width .3s ease; }
+.bar__fill--hp { background: linear-gradient(90deg, #FF1744, #FF5252); }
+.bar__fill--mp { background: linear-gradient(90deg, #2962FF, #448AFF); }
+.bar__val { font-size: 11px; color: var(--text-dim); min-width: 80px; text-align: right; font-family: 'Consolas', monospace; }
+
+/* FORMS */
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  gap: 8px;
+}
+.form-row__lbl { font-size: 12px; color: var(--text-dim); }
+
+.input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color .2s;
+}
+.input:focus { border-color: var(--accent); }
+.input--small { width: 60px; }
+
+.slider { width: 100px; accent-color: var(--accent); }
+
+/* TOGGLE */
+.toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle__track {
+  position: absolute; inset: 0; background: #333; border-radius: 10px;
+  cursor: pointer; transition: background .2s;
+}
+.toggle__track::before {
+  content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px;
+  background: var(--text-dim); border-radius: 50%; transition: transform .2s;
+}
+.toggle input:checked + .toggle__track { background: var(--accent); }
+.toggle input:checked + .toggle__track::before { transform: translateX(16px); background: #fff; }
+
+/* BUTTONS */
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--accent);
+  background: rgba(0,212,255,.1);
+  color: var(--accent);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all .2s;
+}
+.btn:hover { background: rgba(0,212,255,.2); }
+.btn--start { border-color: var(--green); color: var(--green); background: rgba(0,255,136,.1); }
+.btn--start:hover { background: rgba(0,255,136,.2); }
+.btn--stop { border-color: var(--red); color: var(--red); background: rgba(255,59,92,.1); }
+.btn--stop:hover { background: rgba(255,59,92,.2); }
+.btn--sm { padding: 3px 8px; font-size: 11px; }
+
+/* LIST */
+.list { list-style: none; max-height: 200px; overflow-y: auto; }
+.list__item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,.03);
+  font-size: 12px; cursor: pointer;
+}
+.list__item:hover { background: rgba(0,212,255,.05); }
+.list__empty { color: var(--text-dim); font-style: italic; padding: 8px; text-align: center; }
+
+/* LOG */
+.log {
+  background: #0A0A1A;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: 'Consolas', monospace;
+  font-size: 11px;
+  max-height: 200px;
+  overflow-y: auto;
+  color: var(--text-dim);
+}
+.log__line { padding: 1px 0; }
+.log__line--info { color: var(--accent); }
+.log__line--warn { color: var(--warn); }
+.log__line--err  { color: var(--red); }
+
+/* STATE DISPLAY */
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.state-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.state-item__k { color: var(--text-dim); }
+.state-item__v { color: var(--text); font-family: 'Consolas', monospace; }
+
+/* MOB LIST checkbox */
+.mob-check { accent-color: var(--accent); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <span class="header__title">KOXP Bot</span>
+  <div class="header__status">
+    <span class="pill pill--err" id="sHook">HOOK</span>
+    <span class="pill pill--err" id="sBot">BOT</span>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <button class="nav__btn nav__btn--active" data-panel="dashboard">Dashboard</button>
+  <button class="nav__btn" data-panel="combat">Combat</button>
+  <button class="nav__btn" data-panel="protect">Protect</button>
+  <button class="nav__btn" data-panel="targets">Targets</button>
+  <button class="nav__btn" data-panel="log">Log</button>
+</div>
+
+<!-- DASHBOARD -->
+<section class="panel panel--active" id="panel-dashboard">
+  <!-- Vitals -->
+  <div class="card">
+    <div class="card__h">VITALS</div>
+    <div class="bar-row">
+      <span class="bar-row__lbl" style="color:var(--hp)">HP</span>
+      <div class="bar"><div class="bar__fill bar__fill--hp" id="hpBar" style="width:100%"></div></div>
+      <span class="bar__val" id="hpText">0 / 0</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-row__lbl" style="color:var(--mp)">MP</span>
+      <div class="bar"><div class="bar__fill bar__fill--mp" id="mpBar" style="width:100%"></div></div>
+      <span class="bar__val" id="mpText">0 / 0</span>
+    </div>
+  </div>
+
+  <!-- State -->
+  <div class="card">
+    <div class="card__h">STATE</div>
+    <div class="state-grid">
+      <div class="state-item"><span class="state-item__k">Name</span><span class="state-item__v" id="stName">-</span></div>
+      <div class="state-item"><span class="state-item__k">Level</span><span class="state-item__v" id="stLevel">-</span></div>
+      <div class="state-item"><span class="state-item__k">Zone</span><span class="state-item__v" id="stZone">-</span></div>
+      <div class="state-item"><span class="state-item__k">Bot</span><span class="state-item__v" id="stBotState">idle</span></div>
+      <div class="state-item"><span class="state-item__k">Target</span><span class="state-item__v" id="stTarget">-</span></div>
+      <div class="state-item"><span class="state-item__k">Pos</span><span class="state-item__v" id="stPos">-</span></div>
+    </div>
+  </div>
+
+  <!-- Bot Controls -->
+  <div class="card">
+    <div class="card__h">CONTROLS</div>
+    <div style="display:flex;gap:8px;justify-content:center;padding:4px">
+      <button class="btn btn--start" id="btnStart" onclick="sendCmd('bot.start')">START</button>
+      <button class="btn btn--stop"  id="btnStop"  onclick="sendCmd('bot.stop')">STOP</button>
+    </div>
+  </div>
+</section>
+
+<!-- COMBAT -->
+<section class="panel" id="panel-combat">
+  <div class="card">
+    <div class="card__h">ATTACK</div>
+    <div class="form-row">
+      <span class="form-row__lbl">Enable Attack</span>
+      <label class="toggle"><input type="checkbox" id="cfgAtkEn" onchange="setConfig('attack.enabled',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">Target Lock</span>
+      <label class="toggle"><input type="checkbox" id="cfgAtkLock" checked onchange="setConfig('attack.targetLock',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">Range</span>
+      <input class="input input--small" type="number" id="cfgAtkRange" value="50" min="1" max="100" onchange="setConfig('attack.range',this.value)"/>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">Speed</span>
+      <input class="input input--small" type="number" id="cfgAtkSpeed" value="1.0" min="0.1" max="5" step="0.1" onchange="setConfig('attack.attackSpeed',this.value)"/>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__h">BUFF<button class="btn btn--sm" onclick="sendCmd('skills.list')">REFRESH</button></div>
+    <div class="form-row">
+      <span class="form-row__lbl">Enable Buff</span>
+      <label class="toggle"><input type="checkbox" id="cfgBuffEn" onchange="setConfig('buff.enabled',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">Interval (s)</span>
+      <input class="input input--small" type="number" id="cfgBuffInterval" value="30" min="5" max="300" onchange="setConfig('buff.checkInterval',this.value)"/>
+    </div>
+    <ul class="list" id="buffList">
+      <li class="list__empty">REFRESH ile buff skill listesi yukleyin</li>
+    </ul>
+  </div>
+</section>
+
+<!-- PROTECT -->
+<section class="panel" id="panel-protect">
+  <div class="card">
+    <div class="card__h">HP PROTECTION</div>
+    <div class="form-row">
+      <span class="form-row__lbl">Enable</span>
+      <label class="toggle"><input type="checkbox" id="cfgHpEn" onchange="setConfig('potion.hpEnabled',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">HP Threshold</span>
+      <input class="slider" type="range" min="1" max="99" value="60" id="cfgHpPct" oninput="$('cfgHpPctVal').textContent=this.value" onchange="setConfig('potion.hpThreshold',this.value)"/>
+      <span id="cfgHpPctVal">60</span><span>%</span>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">HP Skill ID</span>
+      <input class="input input--small" type="number" id="cfgHpSkill" placeholder="auto" onchange="setConfig('potion.hpSkillId',this.value)"/>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__h">MP PROTECTION</div>
+    <div class="form-row">
+      <span class="form-row__lbl">Enable</span>
+      <label class="toggle"><input type="checkbox" id="cfgMpEn" onchange="setConfig('potion.mpEnabled',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">MP Threshold</span>
+      <input class="slider" type="range" min="1" max="99" value="30" id="cfgMpPct" oninput="$('cfgMpPctVal').textContent=this.value" onchange="setConfig('potion.mpThreshold',this.value)"/>
+      <span id="cfgMpPctVal">30</span><span>%</span>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">MP Skill ID</span>
+      <input class="input input--small" type="number" id="cfgMpSkill" placeholder="auto" onchange="setConfig('potion.mpSkillId',this.value)"/>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__h">AUTO LOOT</div>
+    <div class="form-row">
+      <span class="form-row__lbl">Auto Loot</span>
+      <label class="toggle"><input type="checkbox" id="cfgLootEn" onchange="setConfig('loot.autoLoot',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">Loot Coins</span>
+      <label class="toggle"><input type="checkbox" id="cfgLootCoins" checked onchange="setConfig('loot.lootCoins',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+    <div class="form-row">
+      <span class="form-row__lbl">Loot Items</span>
+      <label class="toggle"><input type="checkbox" id="cfgLootItems" checked onchange="setConfig('loot.lootItems',this.checked)"/><span class="toggle__track"></span></label>
+    </div>
+  </div>
+</section>
+
+<!-- TARGETS -->
+<section class="panel" id="panel-targets">
+  <div class="card">
+    <div class="card__h">
+      NEARBY MOBS
+      <div style="display:flex;gap:4px;align-items:center">
+        <input class="input input--small" type="number" id="cfgRadius" value="50" min="1" max="200" placeholder="radius" onchange="setConfig('target.radius',this.value)"/>
+        <button class="btn btn--sm" onclick="sendCmd('mobs.list')">SCAN</button>
+      </div>
+    </div>
+    <ul class="list" id="mobList">
+      <li class="list__empty">SCAN ile mob listesi yukleyin</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card__h">SELECTED TARGETS <span class="pill pill--ok" id="targetCount" style="font-size:10px">0</span></div>
+    <ul class="list" id="selectedMobs">
+      <li class="list__empty">Yukaridaki listeden mob secin</li>
+    </ul>
+  </div>
+</section>
+
+<!-- LOG -->
+<section class="panel" id="panel-log">
+  <div class="card">
+    <div class="card__h">
+      SYSTEM LOG
+      <button class="btn btn--sm" onclick="clearLog()">CLEAR</button>
+    </div>
+    <div class="log" id="logBox"></div>
+  </div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const state = { curHp:0, maxHp:1, curMp:0, maxMp:1, name:'-', level:0, zone:0, posX:0, posZ:0, isDead:false };
+const selectedMobs = new Set();
+let config = {};
+
+// --- IPC ---
+function sendCmd(op, args) {
+  const msg = JSON.stringify({ op, ...(args || {}) });
+  if (window.chrome && window.chrome.webview)
+    window.chrome.webview.postMessage(msg);
+  else
+    console.log('[no host]', msg);
+}
+
+function setConfig(path, value) {
+  sendCmd('config.set', { path, value: String(value) });
+}
+
+function onMessage(event) {
+  try {
+    const payload = JSON.parse(event.data);
+    if (payload.type === 'event') {
+      if (payload.channel === 'playerState') updatePlayerState(payload.data);
+      else if (payload.channel === 'system') updateSystemState(payload.data);
+      else if (payload.channel === 'mobsList') renderMobList(payload.data);
+      else if (payload.channel === 'skillsList') renderSkillList(payload.data);
+      else if (payload.channel === 'config') updateConfig(payload.data);
+      else if (payload.channel === 'log') appendLog(payload.data.msg);
+    }
+  } catch(e) { console.error('parse error', e); }
+}
+
+if (window.chrome && window.chrome.webview)
+  window.chrome.webview.addEventListener('message', onMessage);
+
+// --- Updates ---
+function updatePlayerState(d) {
+  Object.assign(state, d);
+  const hpPct = state.maxHp > 0 ? (state.curHp / state.maxHp * 100) : 0;
+  const mpPct = state.maxMp > 0 ? (state.curMp / state.maxMp * 100) : 0;
+  $('hpBar').style.width = hpPct + '%';
+  $('mpBar').style.width = mpPct + '%';
+  $('hpText').textContent = `${state.curHp} / ${state.maxHp}`;
+  $('mpText').textContent = `${state.curMp} / ${state.maxMp}`;
+  $('stName').textContent = state.name || '-';
+  $('stLevel').textContent = state.level || '-';
+  $('stZone').textContent = state.zone || '-';
+  $('stPos').textContent = `${(state.posX||0).toFixed(0)}, ${(state.posZ||0).toFixed(0)}`;
+  $('stTarget').textContent = state.isDead ? 'DEAD' : '-';
+}
+
+function updateSystemState(d) {
+  const hook = $('sHook');
+  const bot = $('sBot');
+  if (d.hookOk) { hook.className = 'pill pill--ok'; hook.textContent = 'HOOK'; }
+  else          { hook.className = 'pill pill--err'; hook.textContent = 'HOOK'; }
+  if (d.isRunning) { bot.className = 'pill pill--ok'; bot.textContent = d.state || 'RUN'; }
+  else             { bot.className = 'pill pill--err'; bot.textContent = 'OFF'; }
+  $('stBotState').textContent = d.state || 'idle';
+}
+
+function updateConfig(d) {
+  config = d;
+  if (d.attack) {
+    $('cfgAtkEn').checked = d.attack.enabled;
+    $('cfgAtkLock').checked = d.attack.targetLock;
+    $('cfgAtkRange').value = d.attack.range;
+    $('cfgAtkSpeed').value = d.attack.attackSpeed;
+  }
+  if (d.buff) {
+    $('cfgBuffEn').checked = d.buff.enabled;
+    $('cfgBuffInterval').value = d.buff.checkInterval;
+  }
+  if (d.potion) {
+    $('cfgHpEn').checked = d.potion.hpEnabled;
+    $('cfgHpPct').value = d.potion.hpThreshold;
+    $('cfgHpPctVal').textContent = Math.round(d.potion.hpThreshold);
+    $('cfgMpEn').checked = d.potion.mpEnabled;
+    $('cfgMpPct').value = d.potion.mpThreshold;
+    $('cfgMpPctVal').textContent = Math.round(d.potion.mpThreshold);
+  }
+  if (d.loot) {
+    $('cfgLootEn').checked = d.loot.autoLoot;
+    $('cfgLootCoins').checked = d.loot.lootCoins;
+    $('cfgLootItems').checked = d.loot.lootItems;
+  }
+  if (d.target) {
+    $('cfgRadius').value = d.target.radius;
+  }
+}
+
+// --- Mob List ---
+function renderMobList(mobs) {
+  const ul = $('mobList');
+  if (!mobs || mobs.length === 0) {
+    ul.innerHTML = '<li class="list__empty">Yakinlarda mob bulunamadi</li>';
+    return;
+  }
+  ul.innerHTML = mobs.map(m => {
+    const checked = selectedMobs.has(m.name) ? 'checked' : '';
+    const hpPct = m.maxHp > 0 ? Math.round(m.hp / m.maxHp * 100) : 0;
+    return `<li class="list__item">
+      <input type="checkbox" class="mob-check" ${checked} data-mob="${m.name}" onchange="toggleMob(this)"/>
+      <span style="flex:1">${m.name}</span>
+      <span style="color:var(--text-dim);font-size:11px">${m.distance.toFixed(0)}m</span>
+      <span style="color:var(--hp);font-size:11px">${hpPct}%</span>
+    </li>`;
+  }).join('');
+}
+
+function toggleMob(el) {
+  const name = el.dataset.mob;
+  if (el.checked) selectedMobs.add(name);
+  else selectedMobs.delete(name);
+  renderSelectedMobs();
+}
+
+function renderSelectedMobs() {
+  const ul = $('selectedMobs');
+  $('targetCount').textContent = selectedMobs.size;
+  if (selectedMobs.size === 0) {
+    ul.innerHTML = '<li class="list__empty">Mob secilmedi</li>';
+    return;
+  }
+  ul.innerHTML = [...selectedMobs].map(name =>
+    `<li class="list__item">
+      <span style="flex:1">${name}</span>
+      <button class="btn btn--sm btn--stop" onclick="removeMob('${name}')">X</button>
+    </li>`
+  ).join('');
+}
+
+function removeMob(name) {
+  selectedMobs.delete(name);
+  renderSelectedMobs();
+  document.querySelectorAll('.mob-check').forEach(cb => {
+    if (cb.dataset.mob === name) cb.checked = false;
+  });
+}
+
+// --- Skill List ---
+function renderSkillList(skills) {
+  const ul = $('buffList');
+  if (!skills || skills.length === 0) {
+    ul.innerHTML = '<li class="list__empty">Skill bulunamadi</li>';
+    return;
+  }
+  ul.innerHTML = skills.map(s =>
+    `<li class="list__item">
+      <input type="checkbox" class="mob-check" data-skill="${s.id}"/>
+      <span style="flex:1">${s.name}</span>
+      <span style="color:var(--text-dim);font-size:11px">ID:${s.id}</span>
+    </li>`
+  ).join('');
+}
+
+// --- Log ---
+function appendLog(msg) {
+  const box = $('logBox');
+  const cls = msg.includes('[HATA]') || msg.includes('[ERR]') ? 'log__line--err'
+            : msg.includes('[UYARI]') || msg.includes('[WARN]') ? 'log__line--warn'
+            : 'log__line--info';
+  const time = new Date().toLocaleTimeString();
+  box.innerHTML += `<div class="log__line ${cls}">[${time}] ${msg}</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearLog() {
+  $('logBox').innerHTML = '';
+}
+
+// --- Nav ---
+document.querySelectorAll('.nav__btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav__btn').forEach(b => b.classList.remove('nav__btn--active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('panel--active'));
+    btn.classList.add('nav__btn--active');
+    const p = $('panel-' + btn.dataset.panel);
+    if (p) p.classList.add('panel--active');
+  });
+});
+
+// Baslangic
+appendLog('KOXP Bot UI yuklendi');
+sendCmd('config.get', { reason: 'init' });
+sendCmd('subscribe', { channel: 'playerState' });
+sendCmd('subscribe', { channel: 'system' });
+</script>
+</body>
+</html>
