@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <mutex>
 
 namespace core {
 

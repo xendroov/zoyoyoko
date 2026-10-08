@@ -1,6 +1,8 @@
 #include "bot/engine.h"
 #include "core/game.h"
+#include "core/packets.h"
 #include "gui/bridge.h"
+#include <Windows.h>
 #include <chrono>
 #include <sstream>
 #include <algorithm>
@@ -73,7 +75,7 @@ void Engine::TickPotion() {
     auto& game = core::Game::Get();
     auto player = game.GetPlayer();
 
-    std::lock_guard lock(configMutex_);
+    std::lock_guard<std::mutex> lock(configMutex_);
 
     // HP kontrolu
     if (config_.potion.hpEnabled && player.maxHp > 0) {
@@ -107,7 +109,7 @@ void Engine::TickBuff() {
     state_ = BotState::Buffing;
     auto& game = core::Game::Get();
 
-    std::lock_guard lock(configMutex_);
+    std::lock_guard<std::mutex> lock(configMutex_);
     for (uint32_t skillId : config_.buff.skills) {
         game.UseSkill(skillId);
         Sleep(500); // Skill arasi bekleme
@@ -135,7 +137,7 @@ void Engine::TickAttack() {
     if (now - lastAttackTime_ < attackInterval) return;
     lastAttackTime_ = now;
 
-    std::lock_guard lock(configMutex_);
+    std::lock_guard<std::mutex> lock(configMutex_);
 
     // Skill rotation
     if (!config_.attack.skillRotation.empty()) {
@@ -165,7 +167,7 @@ bool Engine::FindAndSelectTarget() {
     auto& game = core::Game::Get();
     auto npcs = game.GetNearbyNpcs(config_.target.radius);
 
-    std::lock_guard lock(configMutex_);
+    std::lock_guard<std::mutex> lock(configMutex_);
 
     for (auto& npc : npcs) {
         if (npc.isDead || !npc.isEnemy) continue;

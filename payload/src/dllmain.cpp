@@ -43,17 +43,17 @@ void MainThread(HMODULE hModule) {
         printf("[KOXP] Pattern'leri sunucu versiyonunuza gore guncelleyin.\n");
 
         auto& ptrs = game.GetPointers();
-        printf("  ptrChar:    0x%08X\n", ptrs.ptrChar);
-        printf("  fncSend:    0x%08X\n", ptrs.fncSend);
-        printf("  fncRecv:    0x%08X\n", ptrs.fncRecv);
-        printf("  fncTarget:  0x%08X\n", ptrs.fncTargetSelect);
+        printf("  ptrChar:    0x%08X\n", static_cast<unsigned>(ptrs.ptrChar));
+        printf("  fncSend:    0x%08X\n", static_cast<unsigned>(ptrs.fncSend));
+        printf("  fncRecv:    0x%08X\n", static_cast<unsigned>(ptrs.fncRecv));
+        printf("  fncTarget:  0x%08X\n", static_cast<unsigned>(ptrs.fncTargetSelect));
     } else {
         auto& ptrs = game.GetPointers();
         printf("[KOXP] Pointer'lar bulundu:\n");
-        printf("  ptrChar:    0x%08X\n", ptrs.ptrChar);
-        printf("  fncSend:    0x%08X\n", ptrs.fncSend);
-        printf("  fncRecv:    0x%08X\n", ptrs.fncRecv);
-        printf("  fncTarget:  0x%08X\n", ptrs.fncTargetSelect);
+        printf("  ptrChar:    0x%08X\n", static_cast<unsigned>(ptrs.ptrChar));
+        printf("  fncSend:    0x%08X\n", static_cast<unsigned>(ptrs.fncSend));
+        printf("  fncRecv:    0x%08X\n", static_cast<unsigned>(ptrs.fncRecv));
+        printf("  fncTarget:  0x%08X\n", static_cast<unsigned>(ptrs.fncTargetSelect));
 
         // 2. Packet hook'larini kur
         auto& hooks = core::HookManager::Get();

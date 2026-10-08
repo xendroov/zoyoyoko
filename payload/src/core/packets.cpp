@@ -114,19 +114,19 @@ PacketHook& PacketHook::Get() {
 }
 
 void PacketHook::RegisterCallback(PacketCallback cb) {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     callbacks_.push_back(std::move(cb));
 }
 
 void PacketHook::OnSend(uint8_t* data, size_t size) {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     PacketEvent event{PacketDirection::Send, Packet(data, size), false};
     for (auto& cb : callbacks_)
         cb(event);
 }
 
 void PacketHook::OnRecv(uint8_t* data, size_t size) {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     PacketEvent event{PacketDirection::Recv, Packet(data, size), false};
     for (auto& cb : callbacks_)
         cb(event);
@@ -143,7 +143,7 @@ bool PacketHook::InstallRecvHook(uintptr_t recvFnc) {
 }
 
 void PacketHook::Remove() {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     callbacks_.clear();
 }
 

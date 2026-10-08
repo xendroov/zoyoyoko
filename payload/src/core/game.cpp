@@ -1,5 +1,6 @@
 #include "core/game.h"
 #include "core/memory.h"
+#include "core/packets.h"
 #include <cmath>
 
 namespace core {

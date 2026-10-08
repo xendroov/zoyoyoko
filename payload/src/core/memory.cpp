@@ -1,7 +1,10 @@
 #include "core/memory.h"
 #include <TlHelp32.h>
+#include <Psapi.h>
 #include <sstream>
 #include <algorithm>
+
+#pragma comment(lib, "Psapi.lib")
 
 namespace core {
 
