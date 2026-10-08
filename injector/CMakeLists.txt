@@ -10,6 +10,7 @@ target_link_libraries(KoxpInjector PRIVATE
     user32
     shell32
     advapi32
+    comdlg32
 )
 
 set_target_properties(KoxpInjector PROPERTIES

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <ShlObj.h>
 
 // --- Process bulma ---
 
@@ -76,6 +77,25 @@ bool EnableDebugPrivilege() {
     return ok;
 }
 
+// --- Dosya secme dialog ---
+
+std::string OpenFileDialog(const char* filter, const char* title) {
+    char filename[MAX_PATH] = {};
+
+    OPENFILENAMEA ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFilter = filter;
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrTitle = title;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (GetOpenFileNameA(&ofn))
+        return std::string(filename);
+    return "";
+}
+
 // --- DLL okuma ---
 
 std::vector<uint8_t> ReadFileBytes(const std::string& path) {
@@ -93,7 +113,6 @@ std::vector<uint8_t> ReadFileBytes(const std::string& path) {
 // --- Manual Map Injection ---
 
 bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
-    // 1. PE header'larini parse et
     auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(dllData.data());
     if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
         printf("[-] Gecersiz DOS signature\n");
@@ -111,7 +130,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
         return false;
     }
 
-    // 2. Hedef process'te bellek ayir
     size_t imageSize = nt->OptionalHeader.SizeOfImage;
     void* remoteBase = VirtualAllocEx(hProcess, nullptr, imageSize,
         MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
@@ -121,11 +139,9 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
     }
     printf("[+] Remote base: 0x%p\n", remoteBase);
 
-    // 3. Header'lari yaz
     WriteProcessMemory(hProcess, remoteBase, dllData.data(),
         nt->OptionalHeader.SizeOfHeaders, nullptr);
 
-    // 4. Section'lari yaz
     auto* section = IMAGE_FIRST_SECTION(nt);
     for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
         if (section[i].SizeOfRawData == 0) continue;
@@ -139,8 +155,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
         }
     }
 
-    // 5. Shellcode: relocation + import + DllMain cagirma
-    // Shellcode icin loader struct
     struct LoaderData {
         uintptr_t imageBase;
         uintptr_t ntHeaders;
@@ -154,7 +168,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
     loaderData.pLoadLibraryA  = reinterpret_cast<uintptr_t>(GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA"));
     loaderData.pGetProcAddress = reinterpret_cast<uintptr_t>(GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetProcAddress"));
 
-    // Loader shellcode (C fonksiyonu olarak)
     auto LoaderShellcode = [](LoaderData* data) -> DWORD {
         auto* nt = reinterpret_cast<IMAGE_NT_HEADERS*>(data->ntHeaders);
         auto base = data->imageBase;
@@ -164,7 +177,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
         auto pLoadLib = reinterpret_cast<fnLoadLibraryA>(data->pLoadLibraryA);
         auto pGetProc = reinterpret_cast<fnGetProcAddress>(data->pGetProcAddress);
 
-        // Relocation
         auto delta = static_cast<ptrdiff_t>(base - nt->OptionalHeader.ImageBase);
         if (delta != 0 && nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size > 0) {
             auto* reloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(
@@ -185,7 +197,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
             }
         }
 
-        // Import resolution
         if (nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size > 0) {
             auto* importDesc = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(
                 base + nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
@@ -214,7 +225,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
             }
         }
 
-        // DllMain cagir
         using fnDllMain = BOOL(WINAPI*)(HMODULE, DWORD, LPVOID);
         auto entryPoint = reinterpret_cast<fnDllMain>(base + nt->OptionalHeader.AddressOfEntryPoint);
         entryPoint(reinterpret_cast<HMODULE>(base), DLL_PROCESS_ATTACH, nullptr);
@@ -222,7 +232,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
         return 0;
     };
 
-    // Shellcode'u ve data'yi hedef process'e yaz
     void* remoteData = VirtualAllocEx(hProcess, nullptr, sizeof(LoaderData),
         MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (!remoteData) {
@@ -232,7 +241,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
     }
     WriteProcessMemory(hProcess, remoteData, &loaderData, sizeof(LoaderData), nullptr);
 
-    // Shellcode boyutunu tahmin et (sayfaya yuvarla)
     size_t shellcodeSize = 4096;
     void* remoteShellcode = VirtualAllocEx(hProcess, nullptr, shellcodeSize,
         MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
@@ -244,7 +252,6 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
     }
     WriteProcessMemory(hProcess, remoteShellcode, &LoaderShellcode, shellcodeSize, nullptr);
 
-    // 6. Remote thread baslat
     printf("[+] Loader thread baslatiliyor...\n");
     HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0,
         reinterpret_cast<LPTHREAD_START_ROUTINE>(remoteShellcode),
@@ -264,12 +271,49 @@ bool ManualMap(HANDLE hProcess, const std::vector<uint8_t>& dllData) {
     GetExitCodeThread(hThread, &exitCode);
     CloseHandle(hThread);
 
-    // Temizlik
     VirtualFreeEx(hProcess, remoteData, 0, MEM_RELEASE);
     VirtualFreeEx(hProcess, remoteShellcode, 0, MEM_RELEASE);
 
     printf("[+] DllMain cagrildi\n");
     return true;
+}
+
+// --- LoadLibrary injection (yedek yontem) ---
+
+bool InjectLoadLibrary(HANDLE hProcess, const std::string& dllPath) {
+    size_t pathLen = dllPath.size() + 1;
+
+    void* remotePath = VirtualAllocEx(hProcess, nullptr, pathLen,
+        MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!remotePath) {
+        printf("[-] VirtualAllocEx basarisiz: 0x%X\n", GetLastError());
+        return false;
+    }
+
+    WriteProcessMemory(hProcess, remotePath, dllPath.c_str(), pathLen, nullptr);
+
+    HMODULE hKernel = GetModuleHandleA("kernel32.dll");
+    auto pLoadLibrary = reinterpret_cast<LPTHREAD_START_ROUTINE>(
+        GetProcAddress(hKernel, "LoadLibraryA"));
+
+    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0,
+        pLoadLibrary, remotePath, 0, nullptr);
+
+    if (!hThread) {
+        printf("[-] CreateRemoteThread basarisiz: 0x%X\n", GetLastError());
+        VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+        return false;
+    }
+
+    WaitForSingleObject(hThread, INFINITE);
+
+    DWORD exitCode;
+    GetExitCodeThread(hThread, &exitCode);
+    CloseHandle(hThread);
+    VirtualFreeEx(hProcess, remotePath, 0, MEM_RELEASE);
+
+    printf("[+] LoadLibrary dondu, HMODULE: 0x%08X\n", exitCode);
+    return exitCode != 0;
 }
 
 // --- Ana giris ---
@@ -289,17 +333,17 @@ int main() {
     }
 
     EnableDebugPrivilege();
+    printf("[+] Debug privilege aktif\n");
 
-    // DLL yolu
+    // DLL yolu (kendi yanindaki)
     char exePath[MAX_PATH];
     GetModuleFileNameA(nullptr, exePath, MAX_PATH);
-    std::string dir(exePath);
-    dir = dir.substr(0, dir.find_last_of('\\') + 1);
-    std::string dllPath = dir + "KoxpPayload.dll";
+    std::string exeDir(exePath);
+    exeDir = exeDir.substr(0, exeDir.find_last_of('\\') + 1);
+    std::string dllPath = exeDir + "KoxpPayload.dll";
 
     printf("[*] DLL: %s\n", dllPath.c_str());
 
-    // DLL oku
     auto dllData = ReadFileBytes(dllPath);
     if (dllData.empty()) {
         printf("[-] DLL okunamadi: %s\n", dllPath.c_str());
@@ -308,16 +352,70 @@ int main() {
     }
     printf("[+] DLL boyutu: %zu bytes\n", dllData.size());
 
-    // Process bul
-    const char* targetProcess = "KnightOnLine.exe";
-    printf("[*] %s araniliyor...\n", targetProcess);
+    // Injection yontemi sec
+    printf("\n[?] Injection yontemi secin:\n");
+    printf("  1 - Otomatik (oyun zaten acik, PID'yi bul)\n");
+    printf("  2 - Launcher ile baslat (Launcher.exe yolunu sec)\n");
+    printf("  3 - LoadLibrary injection (ManualMap basarisiz olursa)\n");
+    printf("\nSeciminiz (1/2/3): ");
 
+    int choice = 0;
+    scanf_s("%d", &choice);
+
+    const char* targetProcess = "KnightOnLine.exe";
     DWORD pid = 0;
-    for (int i = 0; i < 30 && !pid; ++i) {
-        pid = FindProcess(targetProcess);
-        if (!pid) {
-            printf("\r[*] Bekleniyor... (%d/30)", i + 1);
-            Sleep(1000);
+
+    if (choice == 2) {
+        // Launcher yolunu sec
+        printf("\n[*] Launcher.exe dosyasini secin...\n");
+        std::string launcherPath = OpenFileDialog(
+            "Launcher (*.exe)\0*.exe\0Tum Dosyalar\0*.*\0",
+            "Knight Online Launcher Secin");
+
+        if (launcherPath.empty()) {
+            printf("[-] Launcher secilmedi\n");
+            system("pause");
+            return 1;
+        }
+
+        printf("[+] Launcher: %s\n", launcherPath.c_str());
+
+        // Launcher'in dizinini al (calisma dizini olarak)
+        std::string launcherDir = launcherPath.substr(0, launcherPath.find_last_of('\\'));
+
+        // Launcher'i baslat
+        STARTUPINFOA si{};
+        si.cb = sizeof(si);
+        PROCESS_INFORMATION pi{};
+
+        if (!CreateProcessA(launcherPath.c_str(), nullptr, nullptr, nullptr, FALSE,
+            0, nullptr, launcherDir.c_str(), &si, &pi)) {
+            printf("[-] Launcher baslatilamadi: 0x%X\n", GetLastError());
+            system("pause");
+            return 1;
+        }
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        printf("[+] Launcher baslatildi\n");
+
+        // KnightOnLine.exe'nin acilmasini bekle
+        printf("[*] %s bekleniyor (Launcher'dan oyuna girin)...\n", targetProcess);
+        for (int i = 0; i < 120 && !pid; ++i) {
+            pid = FindProcess(targetProcess);
+            if (!pid) {
+                printf("\r[*] Bekleniyor... (%d/120s)", i + 1);
+                Sleep(1000);
+            }
+        }
+    } else {
+        // Mevcut process'i bul
+        printf("\n[*] %s araniliyor...\n", targetProcess);
+        for (int i = 0; i < 30 && !pid; ++i) {
+            pid = FindProcess(targetProcess);
+            if (!pid) {
+                printf("\r[*] Bekleniyor... (%d/30)", i + 1);
+                Sleep(1000);
+            }
         }
     }
 
@@ -328,16 +426,48 @@ int main() {
     }
     printf("\n[+] PID: %d\n", pid);
 
-    // Process'i ac
-    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+    // XIGNCODE yuzunden biraz bekle (tarama bitmeli)
+    printf("[*] Anti-cheat taramasi bitmesi icin 5 saniye bekleniyor...\n");
+    Sleep(5000);
+
+    // Process'i ac - farkli erisim haklari dene
+    HANDLE hProcess = nullptr;
+
+    // Once tam erisim dene
+    hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+    if (!hProcess) {
+        printf("[*] PROCESS_ALL_ACCESS basarisiz, sinirli haklarla deneniyor...\n");
+        hProcess = OpenProcess(
+            PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION |
+            PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION,
+            FALSE, pid);
+    }
+
     if (!hProcess) {
         printf("[-] OpenProcess basarisiz: 0x%X\n", GetLastError());
+        printf("[-] XIGNCODE process'i koruyor olabilir.\n");
+        printf("[-] Launcher ile baslatip, oyun yuklendikten sonra tekrar deneyin.\n");
         system("pause");
         return 1;
     }
 
+    printf("[+] Process acildi\n");
+
     // Inject
-    if (ManualMap(hProcess, dllData)) {
+    bool success = false;
+    if (choice == 3) {
+        printf("\n[*] LoadLibrary injection deneniyor...\n");
+        success = InjectLoadLibrary(hProcess, dllPath);
+    } else {
+        printf("\n[*] ManualMap injection deneniyor...\n");
+        success = ManualMap(hProcess, dllData);
+        if (!success) {
+            printf("[*] ManualMap basarisiz, LoadLibrary ile deneniyor...\n");
+            success = InjectLoadLibrary(hProcess, dllPath);
+        }
+    }
+
+    if (success) {
         printf("\n[+] Injection basarili!\n");
     } else {
         printf("\n[-] Injection basarisiz!\n");
