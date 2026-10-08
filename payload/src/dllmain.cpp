@@ -1,5 +1,7 @@
 #include <Windows.h>
 #include <thread>
+#include <cstdio>
+#include <fstream>
 #include "core/memory.h"
 #include "core/hooks.h"
 #include "core/game.h"
@@ -10,6 +12,29 @@
 
 static HMODULE g_hModule = nullptr;
 static bool    g_running = false;
+static std::ofstream g_logFile;
+
+static void Log(const char* fmt, ...) {
+    char buf[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    if (g_logFile.is_open()) {
+        g_logFile << buf << std::endl;
+        g_logFile.flush();
+    }
+    OutputDebugStringA(buf);
+}
+
+static std::string GetDllDirectory() {
+    char path[MAX_PATH];
+    GetModuleFileNameA(g_hModule, path, MAX_PATH);
+    std::string dir(path);
+    auto pos = dir.find_last_of('\\');
+    return (pos != std::string::npos) ? dir.substr(0, pos + 1) : dir;
+}
 
 // Send hook detour
 static void* g_originalSend = nullptr;
@@ -17,7 +42,6 @@ static void* g_originalSend = nullptr;
 void __cdecl HookedSend(const uint8_t* data, int size) {
     core::PacketHook::Get().OnSend(const_cast<uint8_t*>(data), static_cast<size_t>(size));
 
-    // Orijinal send fonksiyonunu cagir
     if (g_originalSend) {
         using OriginalSend = void(__cdecl*)(const uint8_t*, int);
         reinterpret_cast<OriginalSend>(g_originalSend)(data, size);
@@ -25,74 +49,68 @@ void __cdecl HookedSend(const uint8_t* data, int size) {
 }
 
 void MainThread(HMODULE hModule) {
-    // Konsol olustur (debug icin)
-    AllocConsole();
-    FILE* f;
-    freopen_s(&f, "CONOUT$", "w", stdout);
-    freopen_s(&f, "CONIN$", "r", stdin);
+    // Log dosyasi ac (konsol yerine)
+    std::string logPath = GetDllDirectory() + "koxp_log.txt";
+    g_logFile.open(logPath);
 
-    printf("[KOXP] Bot yukleniyor...\n");
+    Log("[KOXP] Bot yukleniyor...");
 
     // Oyun yuklenene kadar bekle
-    Sleep(3000);
+    Sleep(5000);
 
     // 1. Memory pointer'larini bul
     auto& game = core::Game::Get();
     if (!game.Initialize()) {
-        printf("[KOXP] HATA: Game pointer'lari bulunamadi!\n");
-        printf("[KOXP] Pattern'leri sunucu versiyonunuza gore guncelleyin.\n");
+        Log("[KOXP] HATA: Game pointer'lari bulunamadi!");
+        Log("[KOXP] Pattern'leri sunucu versiyonunuza gore guncelleyin.");
 
         auto& ptrs = game.GetPointers();
-        printf("  ptrChar:    0x%08X\n", static_cast<unsigned>(ptrs.ptrChar));
-        printf("  fncSend:    0x%08X\n", static_cast<unsigned>(ptrs.fncSend));
-        printf("  fncRecv:    0x%08X\n", static_cast<unsigned>(ptrs.fncRecv));
-        printf("  fncTarget:  0x%08X\n", static_cast<unsigned>(ptrs.fncTargetSelect));
+        Log("  ptrChar:    0x%08X", static_cast<unsigned>(ptrs.ptrChar));
+        Log("  fncSend:    0x%08X", static_cast<unsigned>(ptrs.fncSend));
+        Log("  fncRecv:    0x%08X", static_cast<unsigned>(ptrs.fncRecv));
+        Log("  fncTarget:  0x%08X", static_cast<unsigned>(ptrs.fncTargetSelect));
     } else {
         auto& ptrs = game.GetPointers();
-        printf("[KOXP] Pointer'lar bulundu:\n");
-        printf("  ptrChar:    0x%08X\n", static_cast<unsigned>(ptrs.ptrChar));
-        printf("  fncSend:    0x%08X\n", static_cast<unsigned>(ptrs.fncSend));
-        printf("  fncRecv:    0x%08X\n", static_cast<unsigned>(ptrs.fncRecv));
-        printf("  fncTarget:  0x%08X\n", static_cast<unsigned>(ptrs.fncTargetSelect));
+        Log("[KOXP] Pointer'lar bulundu:");
+        Log("  ptrChar:    0x%08X", static_cast<unsigned>(ptrs.ptrChar));
+        Log("  fncSend:    0x%08X", static_cast<unsigned>(ptrs.fncSend));
+        Log("  fncRecv:    0x%08X", static_cast<unsigned>(ptrs.fncRecv));
+        Log("  fncTarget:  0x%08X", static_cast<unsigned>(ptrs.fncTargetSelect));
 
         // 2. Packet hook'larini kur
         auto& hooks = core::HookManager::Get();
         if (ptrs.fncSend) {
             if (hooks.Install("send", ptrs.fncSend, reinterpret_cast<uintptr_t>(&HookedSend))) {
                 g_originalSend = reinterpret_cast<void*>(hooks.GetOriginal<void*>("send"));
-                printf("[KOXP] Send hook kuruldu\n");
+                Log("[KOXP] Send hook kuruldu");
             }
         }
     }
 
     // 3. GUI baslat
-    printf("[KOXP] GUI baslatiliyor...\n");
+    Log("[KOXP] GUI baslatiliyor...");
     auto& overlay = gui::Overlay::Get();
     overlay.Initialize(hModule);
 
     // 4. Bridge baslat
     gui::Bridge::Get().Initialize();
 
-    printf("[KOXP] Bot hazir!\n");
-    printf("[KOXP] Kapatmak icin 'END' tusuna basin.\n");
+    Log("[KOXP] Bot hazir! Kapatmak icin END tusuna basin.");
 
     // Ana mesaj dongusu
     g_running = true;
     MSG msg;
     while (g_running) {
-        // Pencere mesajlarini isle
         while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
             if (msg.message == WM_QUIT) g_running = false;
         }
 
-        // END tusu ile cikis
         if (GetAsyncKeyState(VK_END) & 1) {
             g_running = false;
         }
 
-        // Durum guncellemelerini GUI'ye gonder (saniyede ~2 kez)
         static DWORD lastUpdate = 0;
         DWORD now = GetTickCount();
         if (now - lastUpdate > 500) {
@@ -101,17 +119,16 @@ void MainThread(HMODULE hModule) {
             lastUpdate = now;
         }
 
-        Sleep(16); // ~60 FPS
+        Sleep(16);
     }
 
     // Temizlik
-    printf("[KOXP] Kapatiliyor...\n");
+    Log("[KOXP] Kapatiliyor...");
     bot::Engine::Get().Stop();
     core::HookManager::Get().RemoveAll();
     overlay.Shutdown();
 
-    fclose(f);
-    FreeConsole();
+    g_logFile.close();
     FreeLibraryAndExitThread(hModule, 0);
 }
 
