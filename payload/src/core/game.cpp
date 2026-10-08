@@ -17,14 +17,18 @@ bool Game::Initialize() {
 bool Game::ResolvePointers() {
     pointers_ = {};
 
-    // KnightOnLine.exe uzerinde pattern scan
-    const char* moduleName = nullptr; // ana modul
+    const char* moduleName = nullptr;
 
-    // CPlayer base pointer
-    uintptr_t addr = Memory::PatternScan(moduleName, Patterns::CHAR_BASE);
-    if (addr) {
-        // Pattern'den 2 byte sonrasi pointer adresi (8B 0D [XX XX XX XX])
-        pointers_.ptrChar = Memory::Read<uintptr_t>(addr + 2);
+    // CPlayer base pointer - bilinen adres (module base + offset)
+    uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr));
+    pointers_.ptrChar = moduleBase + Addresses::OFF_BASE_CHAR;
+
+    // Fallback: pattern scan
+    if (Memory::Read<uintptr_t>(pointers_.ptrChar) == 0) {
+        uintptr_t addr = Memory::PatternScan(moduleName, Patterns::CHAR_BASE);
+        if (addr) {
+            pointers_.ptrChar = Memory::Read<uintptr_t>(addr + 2);
+        }
     }
 
     // Send fonksiyonu - once bilinen adres dene, sonra pattern scan
@@ -65,22 +69,16 @@ PlayerInfo Game::GetPlayer() {
     uintptr_t pBase = Memory::Read<uintptr_t>(pointers_.ptrChar);
     if (!pBase) return info;
 
-    // KO CPlayer offsetleri (replika sunucuya gore ayarlanmali)
-    // Bunlar ornek offset'ler, gercek degerler sunucu versiyonuna bagli
-    info.id       = Memory::Read<uint32_t>(pBase + 0x00);
-    Memory::ReadBytes(pBase + 0x04, info.name, 32);
-    info.nation   = Memory::Read<uint8_t>(pBase + 0x28);
-    info.classType= Memory::Read<uint8_t>(pBase + 0x2C);
-    info.level    = Memory::Read<uint8_t>(pBase + 0x30);
-    info.curHp    = Memory::Read<int16_t>(pBase + 0x34);
-    info.maxHp    = Memory::Read<int16_t>(pBase + 0x36);
-    info.curMp    = Memory::Read<int16_t>(pBase + 0x38);
-    info.maxMp    = Memory::Read<int16_t>(pBase + 0x3A);
-    info.posX     = Memory::Read<float>(pBase + 0x40);
-    info.posY     = Memory::Read<float>(pBase + 0x44);
-    info.posZ     = Memory::Read<float>(pBase + 0x48);
-    info.gold     = Memory::Read<uint32_t>(pBase + 0x50);
-    info.zone     = Memory::Read<uint8_t>(pBase + 0x54);
+    // 2626 sunucu CPlayer offsetleri
+    Memory::ReadBytes(pBase + CPlayerOff::NAME, info.name, 16);
+    info.level    = Memory::Read<uint8_t>(pBase + CPlayerOff::LEVEL);
+    info.curHp    = Memory::Read<int16_t>(pBase + CPlayerOff::HP);
+    info.maxHp    = Memory::Read<int16_t>(pBase + CPlayerOff::HP_MAX);
+    info.curMp    = Memory::Read<int16_t>(pBase + CPlayerOff::MP);
+    info.maxMp    = Memory::Read<int16_t>(pBase + CPlayerOff::MP_MAX);
+    info.posX     = Memory::Read<float>(pBase + CPlayerOff::POS_X);
+    info.posY     = Memory::Read<float>(pBase + CPlayerOff::POS_Y);
+    info.posZ     = Memory::Read<float>(pBase + CPlayerOff::POS_Z);
     info.isDead   = (info.curHp <= 0);
 
     return info;

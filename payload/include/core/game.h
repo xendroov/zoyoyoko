@@ -21,7 +21,7 @@ namespace ClassType {
 // Oyuncu bilgileri
 struct PlayerInfo {
     uint32_t id;
-    char     name[32];
+    char     name[16];
     uint8_t  nation;
     uint8_t  classType;
     uint8_t  level;
@@ -103,7 +103,7 @@ namespace Patterns {
     constexpr const char* NPC_IS_ENEMY  = "55 8B EC 56 8B F1 8B 46 ?? 83 F8";
 }
 
-// Bilinen sabit adresler (bu sunucu icin - Themida unpack sonrasi)
+// Bilinen sabit adresler (2626 sunucu, Themida unpack sonrasi)
 namespace Addresses {
     constexpr uintptr_t SND_FNC         = 0x00704070; // CAPISocket::Send
     constexpr uintptr_t ENCRYPT_FLAG    = 0x11159B4;  // 0=plaintext, !=0 encrypted
@@ -111,6 +111,20 @@ namespace Addresses {
     constexpr uintptr_t PACK_LOG_FLAG   = 0x1111FC5;  // debug log flag
     constexpr uintptr_t DYNAMIC_KEY     = 0x11166D0;  // AES key (sunucudan)
     constexpr uintptr_t DYNAMIC_KEY_LEN = 0x11166C8;  // key length
+    constexpr uintptr_t OFF_BASE_CHAR   = 0x00D15574; // CPlayer pointer (module base + offset)
+}
+
+// CPlayer struct offsetleri (2626 sunucu)
+namespace CPlayerOff {
+    constexpr uint32_t NAME     = 0x6A4;  // char[16]
+    constexpr uint32_t LEVEL    = 0x6D0;
+    constexpr uint32_t HP_MAX   = 0x6D4;
+    constexpr uint32_t HP       = 0x6D8;
+    constexpr uint32_t POS_Z    = 0x194;
+    constexpr uint32_t POS_X    = 0x3CC;
+    constexpr uint32_t POS_Y    = 0x3D4;
+    constexpr uint32_t MP_MAX   = 0xBEC;
+    constexpr uint32_t MP       = 0xBF0;
 }
 
 class Game {
