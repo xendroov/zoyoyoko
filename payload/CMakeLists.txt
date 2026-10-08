@@ -3,8 +3,8 @@ project(KoxpPayload LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# WebView2 SDK - NuGet'ten veya manuel olarak indirilmeli
-# set(WEBVIEW2_DIR "${CMAKE_SOURCE_DIR}/packages/Microsoft.Web.WebView2")
+# WebView2 SDK
+set(WEBVIEW2_DIR "${CMAKE_SOURCE_DIR}/packages")
 
 file(GLOB_RECURSE SOURCES
     "src/*.cpp"
@@ -18,7 +18,7 @@ add_library(KoxpPayload SHARED ${SOURCES} ${HEADERS})
 
 target_include_directories(KoxpPayload PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    # ${WEBVIEW2_DIR}/build/native/include
+    ${WEBVIEW2_DIR}/build/native/include
 )
 
 target_link_libraries(KoxpPayload PRIVATE
@@ -27,7 +27,9 @@ target_link_libraries(KoxpPayload PRIVATE
     gdi32
     shell32
     advapi32
-    # ${WEBVIEW2_DIR}/build/native/x86/WebView2LoaderStatic.lib
+    ole32
+    shlwapi
+    ${WEBVIEW2_DIR}/build/native/x86/WebView2LoaderStatic.lib
 )
 
 # UI dosyasini build dizinine kopyala
