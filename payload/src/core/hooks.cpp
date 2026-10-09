@@ -38,7 +38,7 @@ uintptr_t HookManager::AllocateTrampoline(uintptr_t target, const uint8_t* origi
 }
 
 bool HookManager::Install(const char* name, uintptr_t target, uintptr_t detour) {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     if (hooks_.count(name)) return false;
 
@@ -80,7 +80,7 @@ bool HookManager::Install(const char* name, uintptr_t target, uintptr_t detour) 
 }
 
 bool HookManager::Remove(const char* name) {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = hooks_.find(name);
     if (it == hooks_.end()) return false;
@@ -102,7 +102,7 @@ bool HookManager::Remove(const char* name) {
 }
 
 void HookManager::RemoveAll() {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     for (auto& [name, ctx] : hooks_) {
         if (ctx.active) {
             DWORD oldProtect;
@@ -117,7 +117,7 @@ void HookManager::RemoveAll() {
 }
 
 HookContext* HookManager::Find(const char* name) {
-    std::lock_guard lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = hooks_.find(name);
     return it != hooks_.end() ? &it->second : nullptr;
 }
