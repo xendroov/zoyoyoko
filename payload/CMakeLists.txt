@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(KoxpPayload LANGUAGES CXX)
+project(M2Payload LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -14,14 +14,14 @@ file(GLOB_RECURSE HEADERS
     "include/*.h"
 )
 
-add_library(KoxpPayload SHARED ${SOURCES} ${HEADERS})
+add_library(M2Payload SHARED ${SOURCES} ${HEADERS})
 
-target_include_directories(KoxpPayload PRIVATE
+target_include_directories(M2Payload PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${WEBVIEW2_DIR}/build/native/include
 )
 
-target_link_libraries(KoxpPayload PRIVATE
+target_link_libraries(M2Payload PRIVATE
     kernel32
     user32
     gdi32
@@ -33,14 +33,14 @@ target_link_libraries(KoxpPayload PRIVATE
 )
 
 # UI dosyasini build dizinine kopyala
-add_custom_command(TARGET KoxpPayload POST_BUILD
+add_custom_command(TARGET M2Payload POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/ui/index.html"
-        "$<TARGET_FILE_DIR:KoxpPayload>/ui/index.html"
+        "$<TARGET_FILE_DIR:M2Payload>/ui/index.html"
 )
 
-set_target_properties(KoxpPayload PROPERTIES
-    OUTPUT_NAME "KoxpPayload"
+set_target_properties(M2Payload PROPERTIES
+    OUTPUT_NAME "M2Payload"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )

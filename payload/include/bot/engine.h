@@ -10,51 +10,40 @@
 namespace bot {
 
 struct BotConfig {
-    // Genel
     bool enabled = false;
 
-    // Attack
     struct {
         bool   enabled = false;
         bool   targetLock = true;
-        float  range = 50.0f;
+        float  range = 5000.0f;
         float  attackSpeed = 1.0f;
         std::vector<uint32_t> selectedMobs;
         std::vector<uint32_t> skillRotation;
     } attack;
 
-    // Buff
     struct {
         bool enabled = false;
         std::vector<uint32_t> skills;
         float checkInterval = 30.0f;
     } buff;
 
-    // Potion
     struct {
         bool  hpEnabled = false;
         float hpThreshold = 60.0f;
-        uint32_t hpSkillId = 0;  // 0 = otomatik sec
+        uint16_t hpItemCell = 0;
 
-        bool  mpEnabled = false;
-        float mpThreshold = 30.0f;
-        uint32_t mpSkillId = 0;
-
-        bool  minorEnabled = false;
-        float minorThreshold = 80.0f;
-        uint32_t minorSkillId = 0;
+        bool  spEnabled = false;
+        float spThreshold = 30.0f;
+        uint16_t spItemCell = 0;
     } potion;
 
-    // Loot
     struct {
         bool autoLoot = false;
-        bool lootCoins = true;
-        bool lootItems = true;
+        float lootRadius = 500.0f;
     } loot;
 
-    // Target
     struct {
-        float   radius = 50.0f;
+        float   radius = 5000.0f;
         std::vector<std::string> selectedMobNames;
     } target;
 };
@@ -83,7 +72,6 @@ public:
     BotConfig& Config() { return config_; }
     const BotConfig& Config() const { return config_; }
 
-    // JSON config
     std::string ConfigToJson() const;
     bool ConfigFromJson(const std::string& json);
 
@@ -107,7 +95,7 @@ private:
     BotConfig             config_;
     std::mutex            configMutex_;
 
-    uint32_t currentTargetId_ = 0;
+    uint32_t currentTargetVid_ = 0;
     float    lastAttackTime_ = 0.0f;
     float    lastBuffTime_ = 0.0f;
     size_t   skillRotationIdx_ = 0;

@@ -36,68 +36,41 @@ static std::string GetDllDirectory() {
     return (pos != std::string::npos) ? dir.substr(0, pos + 1) : dir;
 }
 
-// Send hook detour (__thiscall -> __fastcall: ECX=this, EDX=unused)
-static void* g_originalSend = nullptr;
-
-void __fastcall HookedSend(void* pThis, void* /*edx*/, const uint8_t* data, int size) {
-    core::PacketHook::Get().OnSend(const_cast<uint8_t*>(data), static_cast<size_t>(size));
-
-    if (g_originalSend) {
-        using OriginalSend = void(__thiscall*)(void*, const uint8_t*, int);
-        reinterpret_cast<OriginalSend>(g_originalSend)(pThis, data, size);
-    }
-}
-
 void MainThread(HMODULE hModule) {
-    // Log dosyasi ac (konsol yerine)
-    std::string logPath = GetDllDirectory() + "koxp_log.txt";
+    std::string logPath = GetDllDirectory() + "m2bot_log.txt";
     g_logFile.open(logPath);
 
-    Log("[KOXP] Bot yukleniyor...");
+    Log("[M2BOT] Bot yukleniyor...");
 
-    // Oyun yuklenene kadar bekle
-    Sleep(5000);
+    Sleep(3000);
 
-    // 1. Memory pointer'larini bul
     auto& game = core::Game::Get();
     if (!game.Initialize()) {
-        Log("[KOXP] HATA: Game pointer'lari bulunamadi!");
-        Log("[KOXP] Pattern'leri sunucu versiyonunuza gore guncelleyin.");
+        Log("[M2BOT] HATA: Game pointer'lari bulunamadi!");
+        Log("[M2BOT] Offsetleri CE ile bulup game.h'a girin.");
 
         auto& ptrs = game.GetPointers();
-        Log("  ptrChar:    0x%08X", static_cast<unsigned>(ptrs.ptrChar));
+        Log("  ptrPlayer:  0x%08X", static_cast<unsigned>(ptrs.ptrPlayer));
+        Log("  ptrNetwork: 0x%08X", static_cast<unsigned>(ptrs.ptrNetwork));
+        Log("  ptrCharMgr: 0x%08X", static_cast<unsigned>(ptrs.ptrCharMgr));
         Log("  fncSend:    0x%08X", static_cast<unsigned>(ptrs.fncSend));
-        Log("  fncRecv:    0x%08X", static_cast<unsigned>(ptrs.fncRecv));
-        Log("  fncTarget:  0x%08X", static_cast<unsigned>(ptrs.fncTargetSelect));
     } else {
         auto& ptrs = game.GetPointers();
-        Log("[KOXP] Pointer'lar bulundu:");
-        Log("  ptrChar:    0x%08X", static_cast<unsigned>(ptrs.ptrChar));
+        Log("[M2BOT] Pointer'lar bulundu:");
+        Log("  ptrPlayer:  0x%08X", static_cast<unsigned>(ptrs.ptrPlayer));
+        Log("  ptrNetwork: 0x%08X", static_cast<unsigned>(ptrs.ptrNetwork));
+        Log("  ptrCharMgr: 0x%08X", static_cast<unsigned>(ptrs.ptrCharMgr));
         Log("  fncSend:    0x%08X", static_cast<unsigned>(ptrs.fncSend));
-        Log("  fncRecv:    0x%08X", static_cast<unsigned>(ptrs.fncRecv));
-        Log("  fncTarget:  0x%08X", static_cast<unsigned>(ptrs.fncTargetSelect));
-
-        // 2. Packet hook'larini kur
-        auto& hooks = core::HookManager::Get();
-        if (ptrs.fncSend) {
-            if (hooks.Install("send", ptrs.fncSend, reinterpret_cast<uintptr_t>(&HookedSend))) {
-                g_originalSend = reinterpret_cast<void*>(hooks.GetOriginal<void*>("send"));
-                Log("[KOXP] Send hook kuruldu");
-            }
-        }
     }
 
-    // 3. GUI baslat
-    Log("[KOXP] GUI baslatiliyor...");
+    Log("[M2BOT] GUI baslatiliyor...");
     auto& overlay = gui::Overlay::Get();
     overlay.Initialize(hModule);
 
-    // 4. Bridge baslat
     gui::Bridge::Get().Initialize();
 
-    Log("[KOXP] Bot hazir! Kapatmak icin END tusuna basin.");
+    Log("[M2BOT] Bot hazir! Kapatmak icin END tusuna basin.");
 
-    // Ana mesaj dongusu
     g_running = true;
     MSG msg;
     while (g_running) {
@@ -122,8 +95,7 @@ void MainThread(HMODULE hModule) {
         Sleep(16);
     }
 
-    // Temizlik
-    Log("[KOXP] Kapatiliyor...");
+    Log("[M2BOT] Kapatiliyor...");
     bot::Engine::Get().Stop();
     core::HookManager::Get().RemoveAll();
     overlay.Shutdown();

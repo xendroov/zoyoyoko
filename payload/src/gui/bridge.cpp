@@ -17,7 +17,6 @@ void Bridge::Initialize() {
     });
 }
 
-// Basit JSON parsing yardimcilari
 static std::string ExtractString(const std::string& json, const std::string& key) {
     auto pos = json.find("\"" + key + "\"");
     if (pos == std::string::npos) return "";
@@ -43,8 +42,6 @@ void Bridge::HandleMessage(const std::string& json) {
         HandleConfigSet(ExtractString(json, "path"), ExtractString(json, "value"));
     else if (op == "mobs.list")
         HandleMobsList();
-    else if (op == "skills.list")
-        HandleSkillsList();
     else if (op.substr(0, 7) == "window.")
         HandleWindowCommand(op.substr(7));
     else if (op == "subscribe") {
@@ -87,8 +84,8 @@ void Bridge::HandleConfigSet(const std::string& path, const std::string& value) 
     else if (path == "buff.enabled")    cfg.buff.enabled = (value == "true");
     else if (path == "potion.hpEnabled") cfg.potion.hpEnabled = (value == "true");
     else if (path == "potion.hpThreshold") cfg.potion.hpThreshold = std::stof(value);
-    else if (path == "potion.mpEnabled") cfg.potion.mpEnabled = (value == "true");
-    else if (path == "potion.mpThreshold") cfg.potion.mpThreshold = std::stof(value);
+    else if (path == "potion.spEnabled") cfg.potion.spEnabled = (value == "true");
+    else if (path == "potion.spThreshold") cfg.potion.spThreshold = std::stof(value);
     else if (path == "loot.autoLoot")   cfg.loot.autoLoot = (value == "true");
     else if (path == "target.radius")   cfg.target.radius = std::stof(value);
 
@@ -97,10 +94,6 @@ void Bridge::HandleConfigSet(const std::string& path, const std::string& value) 
 
 void Bridge::HandleMobsList() {
     SendMobList();
-}
-
-void Bridge::HandleSkillsList() {
-    SendSkillList();
 }
 
 void Bridge::HandleWindowCommand(const std::string& action) {
@@ -112,24 +105,24 @@ void Bridge::HandleWindowCommand(const std::string& action) {
     }
 }
 
-// --- Durum gonderme ---
-
 void Bridge::SendPlayerState() {
     auto& game = core::Game::Get();
     auto player = game.GetPlayer();
 
     std::ostringstream ss;
     ss << "{\"type\":\"event\",\"channel\":\"playerState\",\"data\":{";
-    ss << "\"id\":" << player.id << ",";
+    ss << "\"vid\":" << player.vid << ",";
     ss << "\"name\":\"" << player.name << "\",";
     ss << "\"level\":" << static_cast<int>(player.level) << ",";
+    ss << "\"race\":" << static_cast<int>(player.race) << ",";
     ss << "\"curHp\":" << player.curHp << ",";
     ss << "\"maxHp\":" << player.maxHp << ",";
-    ss << "\"curMp\":" << player.curMp << ",";
-    ss << "\"maxMp\":" << player.maxMp << ",";
+    ss << "\"curSp\":" << player.curSp << ",";
+    ss << "\"maxSp\":" << player.maxSp << ",";
+    ss << "\"exp\":" << player.exp << ",";
+    ss << "\"gold\":" << player.gold << ",";
     ss << "\"posX\":" << player.posX << ",";
-    ss << "\"posZ\":" << player.posZ << ",";
-    ss << "\"zone\":" << static_cast<int>(player.zone) << ",";
+    ss << "\"posY\":" << player.posY << ",";
     ss << "\"isDead\":" << (player.isDead ? "true" : "false");
     ss << "}}";
 
@@ -152,17 +145,17 @@ void Bridge::SendSystemState() {
 
 void Bridge::SendMobList() {
     auto& game = core::Game::Get();
-    auto npcs = game.GetNearbyNpcs(100.0f);
+    auto mobs = game.GetNearbyMobs();
 
     std::ostringstream ss;
     ss << "{\"type\":\"event\",\"channel\":\"mobsList\",\"data\":[";
-    for (size_t i = 0; i < npcs.size(); ++i) {
+    for (size_t i = 0; i < mobs.size(); ++i) {
         if (i > 0) ss << ",";
-        ss << "{\"id\":" << npcs[i].id << ",";
-        ss << "\"name\":\"" << npcs[i].name << "\",";
-        ss << "\"hp\":" << npcs[i].curHp << ",";
-        ss << "\"maxHp\":" << npcs[i].maxHp << ",";
-        ss << "\"distance\":" << npcs[i].distance << "}";
+        ss << "{\"vid\":" << mobs[i].vid << ",";
+        ss << "\"name\":\"" << mobs[i].name << "\",";
+        ss << "\"hp\":" << mobs[i].curHp << ",";
+        ss << "\"maxHp\":" << mobs[i].maxHp << ",";
+        ss << "\"distance\":" << mobs[i].distance << "}";
     }
     ss << "]}";
 
@@ -170,24 +163,13 @@ void Bridge::SendMobList() {
 }
 
 void Bridge::SendSkillList() {
-    auto& game = core::Game::Get();
-    auto skills = game.GetSkillList();
-
     std::ostringstream ss;
-    ss << "{\"type\":\"event\",\"channel\":\"skillsList\",\"data\":[";
-    for (size_t i = 0; i < skills.size(); ++i) {
-        if (i > 0) ss << ",";
-        ss << "{\"id\":" << skills[i].id << ",";
-        ss << "\"name\":\"" << skills[i].name << "\",";
-        ss << "\"type\":" << static_cast<int>(skills[i].type) << "}";
-    }
-    ss << "]}";
-
+    ss << "{\"type\":\"event\",\"channel\":\"skillsList\",\"data\":[]}";
     Overlay::Get().PostMessage(ss.str());
 }
 
 void Bridge::SendBuffList() {
-    SendSkillList(); // simdilik ayni
+    SendSkillList();
 }
 
 void Bridge::SendConfig() {

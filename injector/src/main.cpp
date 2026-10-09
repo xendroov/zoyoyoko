@@ -6,11 +6,10 @@
 #include <TlHelp32.h>
 #include <cstdio>
 #include <string>
-#include <vector>
 #include <fstream>
 #include <ShlObj.h>
 
-// --- Process bulma ---
+static const char* TARGET_PROCESS = "metin2client.bin";
 
 DWORD FindProcess(const char* processName) {
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -31,24 +30,6 @@ DWORD FindProcess(const char* processName) {
     CloseHandle(snap);
     return 0;
 }
-
-// --- Process yolunu al ---
-
-std::string GetProcessPath(DWORD pid) {
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-    if (!hProcess) return "";
-
-    char path[MAX_PATH];
-    DWORD pathSize = MAX_PATH;
-    if (QueryFullProcessImageNameA(hProcess, 0, path, &pathSize)) {
-        CloseHandle(hProcess);
-        return std::string(path);
-    }
-    CloseHandle(hProcess);
-    return "";
-}
-
-// --- Admin kontrolu ---
 
 bool IsElevated() {
     BOOL elevated = FALSE;
@@ -80,8 +61,6 @@ bool RequestElevation() {
     return false;
 }
 
-// --- Debug privilege ---
-
 bool EnableDebugPrivilege() {
     HANDLE token;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token))
@@ -96,27 +75,6 @@ bool EnableDebugPrivilege() {
     CloseHandle(token);
     return ok;
 }
-
-// --- Dosya secme dialog ---
-
-std::string OpenFileDialog(const char* filter, const char* title) {
-    char filename[MAX_PATH] = {};
-
-    OPENFILENAMEA ofn{};
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFilter = filter;
-    ofn.lpstrFile = filename;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrTitle = title;
-    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
-
-    if (GetOpenFileNameA(&ofn))
-        return std::string(filename);
-    return "";
-}
-
-// --- LoadLibrary injection ---
 
 bool InjectLoadLibrary(HANDLE hProcess, const std::string& dllPath) {
     size_t pathLen = dllPath.size() + 1;
@@ -154,140 +112,8 @@ bool InjectLoadLibrary(HANDLE hProcess, const std::string& dllPath) {
     return exitCode != 0;
 }
 
-// --- CREATE_SUSPENDED injection (Xigncode oncesi) ---
-
-bool InjectSuspended(const std::string& launcherPath, const std::string& dllPath) {
-    std::string launcherDir = launcherPath.substr(0, launcherPath.find_last_of('\\'));
-
-    // 1. Launcher'i baslat
-    STARTUPINFOA launcherSi{};
-    launcherSi.cb = sizeof(launcherSi);
-    PROCESS_INFORMATION launcherPi{};
-
-    if (!CreateProcessA(launcherPath.c_str(), nullptr, nullptr, nullptr, FALSE,
-        0, nullptr, launcherDir.c_str(), &launcherSi, &launcherPi)) {
-        printf("[-] Launcher baslatilamadi: 0x%X\n", GetLastError());
-        return false;
-    }
-    printf("[+] Launcher baslatildi (PID: %d)\n", launcherPi.dwProcessId);
-    CloseHandle(launcherPi.hThread);
-
-    // 2. KnightOnLine.exe'nin Launcher'dan acilmasini bekle
-    const char* targetProcess = "KnightOnLine.exe";
-    printf("[*] %s bekleniyor (Launcher'dan oyuna girin)...\n", targetProcess);
-
-    DWORD gamePid = 0;
-    for (int i = 0; i < 120 && !gamePid; ++i) {
-        gamePid = FindProcess(targetProcess);
-        if (!gamePid) {
-            printf("\r[*] Bekleniyor... (%d/120s)", i + 1);
-            Sleep(1000);
-        }
-    }
-
-    if (!gamePid) {
-        printf("\n[-] %s bulunamadi, zaman asimi\n", targetProcess);
-        TerminateProcess(launcherPi.hProcess, 0);
-        CloseHandle(launcherPi.hProcess);
-        return false;
-    }
-
-    // 3. Oyun exe yolunu al ve Launcher'in baslattigini kapat
-    std::string gamePath = GetProcessPath(gamePid);
-    if (gamePath.empty()) {
-        gamePath = launcherDir + "\\" + targetProcess;
-    }
-    printf("\n[+] Oyun yolu: %s\n", gamePath.c_str());
-
-    std::string gameDir = gamePath.substr(0, gamePath.find_last_of('\\'));
-
-    HANDLE hOldGame = OpenProcess(PROCESS_TERMINATE, FALSE, gamePid);
-    if (hOldGame) {
-        TerminateProcess(hOldGame, 0);
-        CloseHandle(hOldGame);
-        printf("[+] Launcher'in baslatigi oyun kapatildi\n");
-        Sleep(1000);
-    }
-
-    // 4. Parent process spoofing icin attribute list hazirla
-    SIZE_T attrListSize = 0;
-    InitializeProcThreadAttributeList(nullptr, 1, 0, &attrListSize);
-
-    std::vector<uint8_t> attrListBuf(attrListSize);
-    auto attrList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attrListBuf.data());
-
-    if (!InitializeProcThreadAttributeList(attrList, 1, 0, &attrListSize)) {
-        printf("[-] Attribute list olusturulamadi: 0x%X\n", GetLastError());
-        TerminateProcess(launcherPi.hProcess, 0);
-        CloseHandle(launcherPi.hProcess);
-        return false;
-    }
-
-    if (!UpdateProcThreadAttribute(attrList, 0,
-        PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
-        &launcherPi.hProcess, sizeof(HANDLE), nullptr, nullptr)) {
-        printf("[-] Parent process ayarlanamadi: 0x%X\n", GetLastError());
-        DeleteProcThreadAttributeList(attrList);
-        TerminateProcess(launcherPi.hProcess, 0);
-        CloseHandle(launcherPi.hProcess);
-        return false;
-    }
-
-    // 5. KnightOnLine.exe'yi CREATE_SUSPENDED ile baslat (parent = Launcher)
-    STARTUPINFOEXA siex{};
-    siex.StartupInfo.cb = sizeof(siex);
-    siex.lpAttributeList = attrList;
-
-    PROCESS_INFORMATION gamePi{};
-    if (!CreateProcessA(gamePath.c_str(), nullptr, nullptr, nullptr, FALSE,
-        CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT,
-        nullptr, gameDir.c_str(),
-        &siex.StartupInfo, &gamePi)) {
-        printf("[-] Oyun CREATE_SUSPENDED ile baslatilamadi: 0x%X\n", GetLastError());
-        DeleteProcThreadAttributeList(attrList);
-        TerminateProcess(launcherPi.hProcess, 0);
-        CloseHandle(launcherPi.hProcess);
-        return false;
-    }
-
-    printf("[+] Oyun SUSPENDED baslatildi (PID: %d)\n", gamePi.dwProcessId);
-    DeleteProcThreadAttributeList(attrList);
-
-    // 6. Suspend durumundayken DLL inject et
-    printf("[*] DLL inject ediliyor (suspended)...\n");
-    bool injected = InjectLoadLibrary(gamePi.hProcess, dllPath);
-
-    if (!injected) {
-        printf("[-] Injection basarisiz, process kapatiliyor\n");
-        TerminateProcess(gamePi.hProcess, 0);
-        CloseHandle(gamePi.hProcess);
-        CloseHandle(gamePi.hThread);
-        TerminateProcess(launcherPi.hProcess, 0);
-        CloseHandle(launcherPi.hProcess);
-        return false;
-    }
-
-    // 7. Ana thread'i devam ettir
-    ResumeThread(gamePi.hThread);
-    printf("[+] Thread resume edildi, oyun basliyor\n");
-
-    CloseHandle(gamePi.hProcess);
-    CloseHandle(gamePi.hThread);
-
-    // 8. 6 saniye sonra Launcher'i kapat
-    printf("[*] 6 saniye sonra Launcher kapatilacak...\n");
-    Sleep(6000);
-    TerminateProcess(launcherPi.hProcess, 0);
-    CloseHandle(launcherPi.hProcess);
-    printf("[+] Launcher kapatildi\n");
-
-    return true;
-}
-
-// --- Ana giris ---
-
 int main() {
-    printf("=== KOXP Injector (x86) ===\n\n");
+    printf("=== M2Bot Injector (x86) ===\n\n");
 
     if (!IsElevated()) {
         printf("[*] Yonetici izni gerekiyor, UAC onayi isteniyor...\n");
@@ -302,12 +128,11 @@ int main() {
     EnableDebugPrivilege();
     printf("[+] Debug privilege aktif\n");
 
-    // DLL yolu (kendi yanindaki)
     char exePath[MAX_PATH];
     GetModuleFileNameA(nullptr, exePath, MAX_PATH);
     std::string exeDir(exePath);
     exeDir = exeDir.substr(0, exeDir.find_last_of('\\') + 1);
-    std::string dllPath = exeDir + "KoxpPayload.dll";
+    std::string dllPath = exeDir + "M2Payload.dll";
 
     printf("[*] DLL: %s\n", dllPath.c_str());
 
@@ -322,59 +147,24 @@ int main() {
         printf("[+] DLL boyutu: %lld bytes\n", static_cast<long long>(check.tellg()));
     }
 
-    printf("\n[?] Injection yontemi secin:\n");
-    printf("  1 - Otomatik (oyun zaten acik, PID'yi bul)\n");
-    printf("  2 - CREATE_SUSPENDED (Launcher ile, Xigncode oncesi) [ONERILEN]\n");
-    printf("  3 - LoadLibrary (oyun acikken, basit injection)\n");
-    printf("\nSeciminiz (1/2/3): ");
+    printf("\n[*] %s araniliyor...\n", TARGET_PROCESS);
+    printf("[*] Metin2 client'i acin ve giris yapin.\n");
 
-    int choice = 0;
-    scanf_s("%d", &choice);
-
-    if (choice == 2) {
-        printf("\n[*] Launcher.exe dosyasini secin...\n");
-        std::string launcherPath = OpenFileDialog(
-            "Launcher (*.exe)\0*.exe\0Tum Dosyalar\0*.*\0",
-            "Knight Online Launcher Secin");
-
-        if (launcherPath.empty()) {
-            printf("[-] Launcher secilmedi\n");
-            system("pause");
-            return 1;
-        }
-
-        printf("[+] Launcher: %s\n", launcherPath.c_str());
-
-        bool success = InjectSuspended(launcherPath, dllPath);
-        if (success)
-            printf("\n[+] Injection basarili!\n");
-        else
-            printf("\n[-] Injection basarisiz!\n");
-
-        printf("\nKapatmak icin bir tusa basin...\n");
-        system("pause");
-        return success ? 0 : 1;
-    }
-
-    // Option 1 ve 3: mevcut process'e inject
-    const char* targetProcess = "KnightOnLine.exe";
     DWORD pid = 0;
-
-    printf("\n[*] %s araniliyor...\n", targetProcess);
-    for (int i = 0; i < 30 && !pid; ++i) {
-        pid = FindProcess(targetProcess);
+    for (int i = 0; i < 60 && !pid; ++i) {
+        pid = FindProcess(TARGET_PROCESS);
         if (!pid) {
-            printf("\r[*] Bekleniyor... (%d/30)", i + 1);
+            printf("\r[*] Bekleniyor... (%d/60s)", i + 1);
             Sleep(1000);
         }
     }
 
     if (!pid) {
-        printf("\n[-] %s bulunamadi\n", targetProcess);
+        printf("\n[-] %s bulunamadi (60s timeout)\n", TARGET_PROCESS);
         system("pause");
         return 1;
     }
-    printf("\n[+] PID: %d\n", pid);
+    printf("\n[+] %s bulundu (PID: %d)\n", TARGET_PROCESS, pid);
 
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (!hProcess) {
@@ -387,18 +177,18 @@ int main() {
 
     if (!hProcess) {
         printf("[-] OpenProcess basarisiz: 0x%X\n", GetLastError());
-        printf("[-] Yontem 2'yi (CREATE_SUSPENDED) deneyin.\n");
+        printf("[-] Metin2'yi yonetici olarak calistirmayin.\n");
         system("pause");
         return 1;
     }
 
     printf("[+] Process acildi\n");
+    printf("[*] LoadLibrary injection yapiliyor...\n");
 
-    printf("\n[*] LoadLibrary injection deneniyor...\n");
     bool success = InjectLoadLibrary(hProcess, dllPath);
 
     if (success)
-        printf("\n[+] Injection basarili!\n");
+        printf("\n[+] Injection basarili! Bot yuklendi.\n");
     else
         printf("\n[-] Injection basarisiz!\n");
 

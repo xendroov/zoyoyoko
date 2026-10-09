@@ -7,51 +7,29 @@
 
 namespace core {
 
-// KO packet opcode'lari
+// Metin2 packet opcode'lari (Client -> Server)
 namespace Opcode {
-    constexpr uint8_t WIZ_LOGIN             = 0x01;
-    constexpr uint8_t WIZ_NEW_CHAR          = 0x02;
-    constexpr uint8_t WIZ_SEL_CHAR          = 0x04;
-    constexpr uint8_t WIZ_GAMESTART         = 0x05;
-    constexpr uint8_t WIZ_MOVE              = 0x06;
-    constexpr uint8_t WIZ_ROTATE            = 0x07;
-    constexpr uint8_t WIZ_ATTACK            = 0x08;
-    constexpr uint8_t WIZ_CHAT              = 0x0A;
-    constexpr uint8_t WIZ_REGENE            = 0x0C;
-    constexpr uint8_t WIZ_DEAD              = 0x0D;
-    constexpr uint8_t WIZ_HP_CHANGE         = 0x13;
-    constexpr uint8_t WIZ_MAGIC_PROCESS     = 0x14;
-    constexpr uint8_t WIZ_MAGIC_FLYING      = 0x15;
-    constexpr uint8_t WIZ_MAGIC_EFFECT      = 0x16;
-    constexpr uint8_t WIZ_NPC_INFO          = 0x1A;
-    constexpr uint8_t WIZ_NPC_MOVE          = 0x1B;
-    constexpr uint8_t WIZ_ITEM_MOVE         = 0x20;
-    constexpr uint8_t WIZ_ITEM_USE          = 0x21;
-    constexpr uint8_t WIZ_ITEM_GET          = 0x22;
-    constexpr uint8_t WIZ_ZONE_CHANGE       = 0x25;
-    constexpr uint8_t WIZ_POINT_CHANGE      = 0x26;
-    constexpr uint8_t WIZ_STATE_CHANGE      = 0x29;
-    constexpr uint8_t WIZ_TARGET_HP         = 0x2E;
-    constexpr uint8_t WIZ_TRADE             = 0x30;
-    constexpr uint8_t WIZ_ITEM_DROP         = 0x33;
-    constexpr uint8_t WIZ_WARP              = 0x3C;
-    constexpr uint8_t WIZ_PARTY             = 0x42;
-    constexpr uint8_t WIZ_SKILL_USE         = 0x4D;
-    constexpr uint8_t WIZ_OBJECT_EVENT      = 0x57;
-    constexpr uint8_t WIZ_SELECT_TARGET     = 0x5E;
-    constexpr uint8_t WIZ_NPC_REGION        = 0x63;
-    constexpr uint8_t WIZ_GOLD_CHANGE       = 0x64;
+    constexpr uint8_t CG_PONG           = 1;
+    constexpr uint8_t CG_ATTACK         = 2;
+    constexpr uint8_t CG_CHAT           = 3;
+    constexpr uint8_t CG_WHISPER        = 4;
+    constexpr uint8_t CG_ITEM_USE       = 10;
+    constexpr uint8_t CG_ITEM_MOVE      = 11;
+    constexpr uint8_t CG_ITEM_PICKUP    = 15;
+    constexpr uint8_t CG_QUICK_SLOT_ADD = 16;
+    constexpr uint8_t CG_QUICK_SLOT_DEL = 17;
+    constexpr uint8_t CG_MOVE           = 18;
+    constexpr uint8_t CG_SYNC_POSITION  = 19;
+    constexpr uint8_t CG_ITEM_DROP      = 20;
+    constexpr uint8_t CG_ON_CLICK       = 26;
+    constexpr uint8_t CG_EXCHANGE       = 27;
+    constexpr uint8_t CG_SHOP           = 50;
+    constexpr uint8_t CG_USE_SKILL      = 61;
+    constexpr uint8_t CG_TARGET         = 65;
+    constexpr uint8_t CG_WARP           = 70;
+    constexpr uint8_t CG_FISHING        = 89;
 }
 
-// KO packet wire format markers
-namespace WireFormat {
-    constexpr uint16_t HEADER = 0xAA55;
-    constexpr uint16_t FOOTER = 0x55AA;
-    constexpr uint8_t  SEQ_MIN = 1;
-    constexpr uint8_t  SEQ_MAX = 250;
-}
-
-// Packet builder
 class Packet {
 public:
     Packet() = default;
@@ -84,7 +62,6 @@ private:
     size_t readPos_ = 0;
 };
 
-// Packet hook callback tipleri
 enum class PacketDirection { Send, Recv };
 
 struct PacketEvent {
@@ -105,7 +82,6 @@ public:
 
     void RegisterCallback(PacketCallback cb);
 
-    // Hook'lardan cagrilan fonksiyonlar
     void OnSend(uint8_t* data, size_t size);
     void OnRecv(uint8_t* data, size_t size);
 

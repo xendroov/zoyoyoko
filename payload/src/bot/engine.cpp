@@ -82,24 +82,22 @@ void Engine::TickPotion() {
 
     std::lock_guard<std::mutex> lock(configMutex_);
 
-    // HP kontrolu
     if (config_.potion.hpEnabled && player.maxHp > 0) {
         float hpPercent = (static_cast<float>(player.curHp) / player.maxHp) * 100.0f;
         if (hpPercent < config_.potion.hpThreshold) {
             state_ = BotState::Healing;
-            if (config_.potion.hpSkillId > 0)
-                game.UseSkill(config_.potion.hpSkillId);
+            if (config_.potion.hpItemCell > 0)
+                game.UseItem(config_.potion.hpItemCell);
             gui::Bridge::Get().SendLog("[POT] HP potion kullanildi");
         }
     }
 
-    // MP kontrolu
-    if (config_.potion.mpEnabled && player.maxMp > 0) {
-        float mpPercent = (static_cast<float>(player.curMp) / player.maxMp) * 100.0f;
-        if (mpPercent < config_.potion.mpThreshold) {
-            if (config_.potion.mpSkillId > 0)
-                game.UseSkill(config_.potion.mpSkillId);
-            gui::Bridge::Get().SendLog("[POT] MP potion kullanildi");
+    if (config_.potion.spEnabled && player.maxSp > 0) {
+        float spPercent = (static_cast<float>(player.curSp) / player.maxSp) * 100.0f;
+        if (spPercent < config_.potion.spThreshold) {
+            if (config_.potion.spItemCell > 0)
+                game.UseItem(config_.potion.spItemCell);
+            gui::Bridge::Get().SendLog("[POT] SP potion kullanildi");
         }
     }
 }
@@ -115,8 +113,8 @@ void Engine::TickBuff() {
     auto& game = core::Game::Get();
 
     std::lock_guard<std::mutex> lock(configMutex_);
-    for (uint32_t skillId : config_.buff.skills) {
-        game.UseSkill(skillId);
+    for (uint32_t skillSlot : config_.buff.skills) {
+        game.UseSkill(skillSlot);
         Sleep(HumanizedDelay(500, 120));
     }
 
@@ -126,7 +124,6 @@ void Engine::TickBuff() {
 void Engine::TickAttack() {
     auto& game = core::Game::Get();
 
-    // Hedef yoksa veya gecersizse yeni hedef bul
     if (!IsTargetValid()) {
         state_ = BotState::Searching;
         if (!FindAndSelectTarget()) {
@@ -144,23 +141,24 @@ void Engine::TickAttack() {
 
     std::lock_guard<std::mutex> lock(configMutex_);
 
-    // Skill rotation
     if (!config_.attack.skillRotation.empty()) {
-        uint32_t skillId = config_.attack.skillRotation[skillRotationIdx_];
-        game.UseSkill(skillId);
+        uint32_t skillSlot = config_.attack.skillRotation[skillRotationIdx_];
+        game.UseSkill(skillSlot);
         skillRotationIdx_ = (skillRotationIdx_ + 1) % config_.attack.skillRotation.size();
     } else {
-        // Normal attack: WIZ_ATTACK paketi
-        core::Packet pkt(core::Opcode::WIZ_ATTACK);
-        pkt.WriteWord(static_cast<uint16_t>(currentTargetId_));
-        pkt.WriteByte(1); // attack type
-        game.SendPacket(pkt.Data(), pkt.Size());
+        game.Attack();
     }
 }
 
 void Engine::TickLoot() {
-    // TODO: Yerdeki itemleri toplama
-    // WIZ_ITEM_GET paketi ile
+    auto& game = core::Game::Get();
+    auto items = game.GetGroundItems(config_.loot.lootRadius);
+
+    if (!items.empty()) {
+        state_ = BotState::Looting;
+        game.PickupItem();
+        Sleep(HumanizedDelay(300, 80));
+    }
 }
 
 void Engine::TickDeath() {
@@ -170,18 +168,18 @@ void Engine::TickDeath() {
 
 bool Engine::FindAndSelectTarget() {
     auto& game = core::Game::Get();
-    auto npcs = game.GetNearbyNpcs(config_.target.radius);
+    auto mobs = game.GetNearbyMobs(config_.target.radius);
 
     std::lock_guard<std::mutex> lock(configMutex_);
 
-    for (auto& npc : npcs) {
-        if (npc.isDead || !npc.isEnemy) continue;
+    for (auto& mob : mobs) {
+        if (mob.isDead) continue;
+        if (mob.type != 2) continue; // sadece monster
 
-        // Secili mob listesi varsa kontrol et
         if (!config_.target.selectedMobNames.empty()) {
             bool found = false;
             for (auto& name : config_.target.selectedMobNames) {
-                if (std::string(npc.name).find(name) != std::string::npos) {
+                if (std::string(mob.name).find(name) != std::string::npos) {
                     found = true;
                     break;
                 }
@@ -189,11 +187,11 @@ bool Engine::FindAndSelectTarget() {
             if (!found) continue;
         }
 
-        currentTargetId_ = npc.id;
-        game.SelectTarget(npc.id);
+        currentTargetVid_ = mob.vid;
+        game.SelectTarget(mob.vid);
 
         std::ostringstream ss;
-        ss << "[TARGET] Hedef secildi: " << npc.name << " (ID: " << npc.id << ")";
+        ss << "[TARGET] Hedef secildi: " << mob.name << " (VID: " << mob.vid << ")";
         gui::Bridge::Get().SendLog(ss.str());
         return true;
     }
@@ -201,13 +199,9 @@ bool Engine::FindAndSelectTarget() {
 }
 
 bool Engine::IsTargetValid() {
-    if (currentTargetId_ == 0) return false;
-    // TODO: Hedefin hala yasayip yasamadigini kontrol et
+    if (currentTargetVid_ == 0) return false;
     return true;
 }
-
-// --- JSON Config ---
-// Basit JSON serialization (harici kutuphane bagimliligini azaltmak icin)
 
 std::string Engine::ConfigToJson() const {
     std::ostringstream ss;
@@ -229,14 +223,13 @@ std::string Engine::ConfigToJson() const {
     ss << "  \"potion\": {\n";
     ss << "    \"hpEnabled\": " << (config_.potion.hpEnabled ? "true" : "false") << ",\n";
     ss << "    \"hpThreshold\": " << config_.potion.hpThreshold << ",\n";
-    ss << "    \"mpEnabled\": " << (config_.potion.mpEnabled ? "true" : "false") << ",\n";
-    ss << "    \"mpThreshold\": " << config_.potion.mpThreshold << "\n";
+    ss << "    \"spEnabled\": " << (config_.potion.spEnabled ? "true" : "false") << ",\n";
+    ss << "    \"spThreshold\": " << config_.potion.spThreshold << "\n";
     ss << "  },\n";
 
     ss << "  \"loot\": {\n";
     ss << "    \"autoLoot\": " << (config_.loot.autoLoot ? "true" : "false") << ",\n";
-    ss << "    \"lootCoins\": " << (config_.loot.lootCoins ? "true" : "false") << ",\n";
-    ss << "    \"lootItems\": " << (config_.loot.lootItems ? "true" : "false") << "\n";
+    ss << "    \"lootRadius\": " << config_.loot.lootRadius << "\n";
     ss << "  },\n";
 
     ss << "  \"target\": {\n";
@@ -248,7 +241,6 @@ std::string Engine::ConfigToJson() const {
 }
 
 bool Engine::ConfigFromJson(const std::string& json) {
-    // TODO: JSON parsing (nlohmann/json veya minimal parser)
     return true;
 }
 

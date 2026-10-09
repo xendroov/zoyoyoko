@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8"/>
-<title>KOXP Bot</title>
+<title>M2Bot</title>
 <style>
 :root {
   --bg-base:    #0F0F23;
@@ -14,7 +14,7 @@
   --accent:     #00D4FF;
   --accent2:    #7B2FFF;
   --hp:         #FF3B5C;
-  --mp:         #3B8BFF;
+  --sp:         #3B8BFF;
   --green:      #00FF88;
   --warn:       #FFB800;
   --red:        #FF3B5C;
@@ -123,7 +123,7 @@ body {
 .bar { flex: 1; height: 18px; background: rgba(255,255,255,.05); border-radius: 4px; overflow: hidden; position: relative; }
 .bar__fill { height: 100%; border-radius: 4px; transition: width .3s ease; }
 .bar__fill--hp { background: linear-gradient(90deg, #FF1744, #FF5252); }
-.bar__fill--mp { background: linear-gradient(90deg, #2962FF, #448AFF); }
+.bar__fill--sp { background: linear-gradient(90deg, #2962FF, #448AFF); }
 .bar__val { font-size: 11px; color: var(--text-dim); min-width: 80px; text-align: right; font-family: 'Consolas', monospace; }
 
 /* FORMS */
@@ -241,7 +241,7 @@ body {
 
 <!-- HEADER -->
 <div class="header">
-  <span class="header__title">KOXP Bot</span>
+  <span class="header__title">M2Bot</span>
   <div class="header__status">
     <span class="pill pill--err" id="sHook">HOOK</span>
     <span class="pill pill--err" id="sBot">BOT</span>
@@ -268,9 +268,9 @@ body {
       <span class="bar__val" id="hpText">0 / 0</span>
     </div>
     <div class="bar-row">
-      <span class="bar-row__lbl" style="color:var(--mp)">MP</span>
-      <div class="bar"><div class="bar__fill bar__fill--mp" id="mpBar" style="width:100%"></div></div>
-      <span class="bar__val" id="mpText">0 / 0</span>
+      <span class="bar-row__lbl" style="color:var(--sp)">SP</span>
+      <div class="bar"><div class="bar__fill bar__fill--sp" id="spBar" style="width:100%"></div></div>
+      <span class="bar__val" id="spText">0 / 0</span>
     </div>
   </div>
 
@@ -280,7 +280,7 @@ body {
     <div class="state-grid">
       <div class="state-item"><span class="state-item__k">Name</span><span class="state-item__v" id="stName">-</span></div>
       <div class="state-item"><span class="state-item__k">Level</span><span class="state-item__v" id="stLevel">-</span></div>
-      <div class="state-item"><span class="state-item__k">Zone</span><span class="state-item__v" id="stZone">-</span></div>
+      <div class="state-item"><span class="state-item__k">Gold</span><span class="state-item__v" id="stGold">-</span></div>
       <div class="state-item"><span class="state-item__k">Bot</span><span class="state-item__v" id="stBotState">idle</span></div>
       <div class="state-item"><span class="state-item__k">Target</span><span class="state-item__v" id="stTarget">-</span></div>
       <div class="state-item"><span class="state-item__k">Pos</span><span class="state-item__v" id="stPos">-</span></div>
@@ -311,7 +311,7 @@ body {
     </div>
     <div class="form-row">
       <span class="form-row__lbl">Range</span>
-      <input class="input input--small" type="number" id="cfgAtkRange" value="50" min="1" max="100" onchange="setConfig('attack.range',this.value)"/>
+      <input class="input input--small" type="number" id="cfgAtkRange" value="5000" min="100" max="15000" onchange="setConfig('attack.range',this.value)"/>
     </div>
     <div class="form-row">
       <span class="form-row__lbl">Speed</span>
@@ -320,7 +320,7 @@ body {
   </div>
 
   <div class="card">
-    <div class="card__h">BUFF<button class="btn btn--sm" onclick="sendCmd('skills.list')">REFRESH</button></div>
+    <div class="card__h">BUFF</div>
     <div class="form-row">
       <span class="form-row__lbl">Enable Buff</span>
       <label class="toggle"><input type="checkbox" id="cfgBuffEn" onchange="setConfig('buff.enabled',this.checked)"/><span class="toggle__track"></span></label>
@@ -329,9 +329,6 @@ body {
       <span class="form-row__lbl">Interval (s)</span>
       <input class="input input--small" type="number" id="cfgBuffInterval" value="30" min="5" max="300" onchange="setConfig('buff.checkInterval',this.value)"/>
     </div>
-    <ul class="list" id="buffList">
-      <li class="list__empty">REFRESH ile buff skill listesi yukleyin</li>
-    </ul>
   </div>
 </section>
 
@@ -349,25 +346,25 @@ body {
       <span id="cfgHpPctVal">60</span><span>%</span>
     </div>
     <div class="form-row">
-      <span class="form-row__lbl">HP Skill ID</span>
-      <input class="input input--small" type="number" id="cfgHpSkill" placeholder="auto" onchange="setConfig('potion.hpSkillId',this.value)"/>
+      <span class="form-row__lbl">HP Item Cell</span>
+      <input class="input input--small" type="number" id="cfgHpCell" placeholder="0" onchange="setConfig('potion.hpItemCell',this.value)"/>
     </div>
   </div>
 
   <div class="card">
-    <div class="card__h">MP PROTECTION</div>
+    <div class="card__h">SP PROTECTION</div>
     <div class="form-row">
       <span class="form-row__lbl">Enable</span>
-      <label class="toggle"><input type="checkbox" id="cfgMpEn" onchange="setConfig('potion.mpEnabled',this.checked)"/><span class="toggle__track"></span></label>
+      <label class="toggle"><input type="checkbox" id="cfgSpEn" onchange="setConfig('potion.spEnabled',this.checked)"/><span class="toggle__track"></span></label>
     </div>
     <div class="form-row">
-      <span class="form-row__lbl">MP Threshold</span>
-      <input class="slider" type="range" min="1" max="99" value="30" id="cfgMpPct" oninput="$('cfgMpPctVal').textContent=this.value" onchange="setConfig('potion.mpThreshold',this.value)"/>
-      <span id="cfgMpPctVal">30</span><span>%</span>
+      <span class="form-row__lbl">SP Threshold</span>
+      <input class="slider" type="range" min="1" max="99" value="30" id="cfgSpPct" oninput="$('cfgSpPctVal').textContent=this.value" onchange="setConfig('potion.spThreshold',this.value)"/>
+      <span id="cfgSpPctVal">30</span><span>%</span>
     </div>
     <div class="form-row">
-      <span class="form-row__lbl">MP Skill ID</span>
-      <input class="input input--small" type="number" id="cfgMpSkill" placeholder="auto" onchange="setConfig('potion.mpSkillId',this.value)"/>
+      <span class="form-row__lbl">SP Item Cell</span>
+      <input class="input input--small" type="number" id="cfgSpCell" placeholder="0" onchange="setConfig('potion.spItemCell',this.value)"/>
     </div>
   </div>
 
@@ -378,12 +375,8 @@ body {
       <label class="toggle"><input type="checkbox" id="cfgLootEn" onchange="setConfig('loot.autoLoot',this.checked)"/><span class="toggle__track"></span></label>
     </div>
     <div class="form-row">
-      <span class="form-row__lbl">Loot Coins</span>
-      <label class="toggle"><input type="checkbox" id="cfgLootCoins" checked onchange="setConfig('loot.lootCoins',this.checked)"/><span class="toggle__track"></span></label>
-    </div>
-    <div class="form-row">
-      <span class="form-row__lbl">Loot Items</span>
-      <label class="toggle"><input type="checkbox" id="cfgLootItems" checked onchange="setConfig('loot.lootItems',this.checked)"/><span class="toggle__track"></span></label>
+      <span class="form-row__lbl">Loot Radius</span>
+      <input class="input input--small" type="number" id="cfgLootRadius" value="500" min="100" max="5000" onchange="setConfig('loot.lootRadius',this.value)"/>
     </div>
   </div>
 </section>
@@ -394,7 +387,7 @@ body {
     <div class="card__h">
       NEARBY MOBS
       <div style="display:flex;gap:4px;align-items:center">
-        <input class="input input--small" type="number" id="cfgRadius" value="50" min="1" max="200" placeholder="radius" onchange="setConfig('target.radius',this.value)"/>
+        <input class="input input--small" type="number" id="cfgRadius" value="5000" min="100" max="15000" placeholder="radius" onchange="setConfig('target.radius',this.value)"/>
         <button class="btn btn--sm" onclick="sendCmd('mobs.list')">SCAN</button>
       </div>
     </div>
@@ -424,7 +417,7 @@ body {
 
 <script>
 const $ = id => document.getElementById(id);
-const state = { curHp:0, maxHp:1, curMp:0, maxMp:1, name:'-', level:0, zone:0, posX:0, posZ:0, isDead:false };
+const state = { curHp:0, maxHp:1, curSp:0, maxSp:1, name:'-', level:0, gold:0, posX:0, posY:0, isDead:false };
 const selectedMobs = new Set();
 let config = {};
 
@@ -448,7 +441,6 @@ function onMessage(event) {
       if (payload.channel === 'playerState') updatePlayerState(payload.data);
       else if (payload.channel === 'system') updateSystemState(payload.data);
       else if (payload.channel === 'mobsList') renderMobList(payload.data);
-      else if (payload.channel === 'skillsList') renderSkillList(payload.data);
       else if (payload.channel === 'config') updateConfig(payload.data);
       else if (payload.channel === 'log') appendLog(payload.data.msg);
     }
@@ -462,15 +454,15 @@ if (window.chrome && window.chrome.webview)
 function updatePlayerState(d) {
   Object.assign(state, d);
   const hpPct = state.maxHp > 0 ? (state.curHp / state.maxHp * 100) : 0;
-  const mpPct = state.maxMp > 0 ? (state.curMp / state.maxMp * 100) : 0;
+  const spPct = state.maxSp > 0 ? (state.curSp / state.maxSp * 100) : 0;
   $('hpBar').style.width = hpPct + '%';
-  $('mpBar').style.width = mpPct + '%';
+  $('spBar').style.width = spPct + '%';
   $('hpText').textContent = `${state.curHp} / ${state.maxHp}`;
-  $('mpText').textContent = `${state.curMp} / ${state.maxMp}`;
+  $('spText').textContent = `${state.curSp} / ${state.maxSp}`;
   $('stName').textContent = state.name || '-';
   $('stLevel').textContent = state.level || '-';
-  $('stZone').textContent = state.zone || '-';
-  $('stPos').textContent = `${(state.posX||0).toFixed(0)}, ${(state.posZ||0).toFixed(0)}`;
+  $('stGold').textContent = state.gold || '-';
+  $('stPos').textContent = `${(state.posX||0).toFixed(0)}, ${(state.posY||0).toFixed(0)}`;
   $('stTarget').textContent = state.isDead ? 'DEAD' : '-';
 }
 
@@ -500,14 +492,13 @@ function updateConfig(d) {
     $('cfgHpEn').checked = d.potion.hpEnabled;
     $('cfgHpPct').value = d.potion.hpThreshold;
     $('cfgHpPctVal').textContent = Math.round(d.potion.hpThreshold);
-    $('cfgMpEn').checked = d.potion.mpEnabled;
-    $('cfgMpPct').value = d.potion.mpThreshold;
-    $('cfgMpPctVal').textContent = Math.round(d.potion.mpThreshold);
+    $('cfgSpEn').checked = d.potion.spEnabled;
+    $('cfgSpPct').value = d.potion.spThreshold;
+    $('cfgSpPctVal').textContent = Math.round(d.potion.spThreshold);
   }
   if (d.loot) {
     $('cfgLootEn').checked = d.loot.autoLoot;
-    $('cfgLootCoins').checked = d.loot.lootCoins;
-    $('cfgLootItems').checked = d.loot.lootItems;
+    $('cfgLootRadius').value = d.loot.lootRadius;
   }
   if (d.target) {
     $('cfgRadius').value = d.target.radius;
@@ -563,22 +554,6 @@ function removeMob(name) {
   });
 }
 
-// --- Skill List ---
-function renderSkillList(skills) {
-  const ul = $('buffList');
-  if (!skills || skills.length === 0) {
-    ul.innerHTML = '<li class="list__empty">Skill bulunamadi</li>';
-    return;
-  }
-  ul.innerHTML = skills.map(s =>
-    `<li class="list__item">
-      <input type="checkbox" class="mob-check" data-skill="${s.id}"/>
-      <span style="flex:1">${s.name}</span>
-      <span style="color:var(--text-dim);font-size:11px">ID:${s.id}</span>
-    </li>`
-  ).join('');
-}
-
 // --- Log ---
 function appendLog(msg) {
   const box = $('logBox');
@@ -606,7 +581,7 @@ document.querySelectorAll('.nav__btn').forEach(btn => {
 });
 
 // Baslangic
-appendLog('KOXP Bot UI yuklendi');
+appendLog('M2Bot UI yuklendi');
 sendCmd('config.get', { reason: 'init' });
 sendCmd('subscribe', { channel: 'playerState' });
 sendCmd('subscribe', { channel: 'system' });
